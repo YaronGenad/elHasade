@@ -18,7 +18,7 @@ const RootRedirect: React.FC = () => {
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress size={48} />
+        <CircularProgress size={48} aria-label="Loading" />
       </Box>
     );
   }
@@ -33,7 +33,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress size={48} />
+        <CircularProgress size={48} aria-label="Loading" />
       </Box>
     );
   }

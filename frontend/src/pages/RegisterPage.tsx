@@ -20,12 +20,14 @@ import LockIcon from '@mui/icons-material/Lock';
 import PersonIcon from '@mui/icons-material/Person';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { getErrorMessage } from '../api/client';
 import { AxiosError } from 'axios';
 
 const registerSchema = z
   .object({
-    fullName: z.string().optional(),
+    fullName: z.string().max(100).transform((v) => v?.replace(/<[^>]*>/g, '').trim()).optional(),
     email: z
       .string()
       .min(1, 'שדה חובה / حقل مطلوب')
@@ -43,6 +45,7 @@ const registerSchema = z
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export const RegisterPage: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { register: registerUser, isAuthenticated } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
@@ -69,17 +72,14 @@ export const RegisterPage: React.FC = () => {
       await registerUser(data.email, data.password, data.fullName || undefined);
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      const axiosErr = err as AxiosError<{ detail?: string }>;
+      const axiosErr = err as AxiosError;
       if (axiosErr.response?.status === 400) {
+        const detail = (axiosErr.response?.data as { detail?: string })?.detail;
         setErrorMessage(
-          axiosErr.response?.data?.detail ??
-            'כתובת האימייל כבר רשומה במערכת / البريد الإلكتروني مسجل بالفعل'
+          detail ?? t('auth.emailAlreadyExists')
         );
       } else {
-        setErrorMessage(
-          axiosErr.response?.data?.detail ??
-            'שגיאה בהרשמה. אנא נסה שוב. / خطأ في التسجيل. الرجاء المحاولة مرة أخرى.'
-        );
+        setErrorMessage(getErrorMessage(axiosErr));
       }
     }
   };
@@ -99,21 +99,21 @@ export const RegisterPage: React.FC = () => {
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           {/* Header */}
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <GrassIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+            <GrassIcon aria-hidden="true" sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
             <Typography variant="h4" color="primary" gutterBottom>
-              Al-Hasade
+              {t('common.appName')}
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              التعليمية | מחולל חומרי לימוד
+              {t('common.appSubtitle')}
             </Typography>
           </Box>
 
           <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
-            הרשמה / إنشاء حساب
+            {t('auth.register')}
           </Typography>
 
           {errorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" role="alert" sx={{ mb: 2 }}>
               {errorMessage}
             </Alert>
           )}
@@ -127,7 +127,7 @@ export const RegisterPage: React.FC = () => {
             {/* Full Name (optional) */}
             <TextField
               {...register('fullName')}
-              label="שם מלא (אופציונלי) / الاسم الكامل (اختياري)"
+              label={t('auth.fullName')}
               autoComplete="name"
               autoFocus
               error={!!errors.fullName}
@@ -135,7 +135,7 @@ export const RegisterPage: React.FC = () => {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <PersonIcon color="action" />
+                    <PersonIcon aria-hidden="true" color="action" />
                   </InputAdornment>
                 ),
               }}
@@ -143,7 +143,7 @@ export const RegisterPage: React.FC = () => {
 
             <TextField
               {...register('email')}
-              label="אימייל / البريد الإلكتروني"
+              label={t('auth.email')}
               type="email"
               autoComplete="email"
               error={!!errors.email}
@@ -151,7 +151,7 @@ export const RegisterPage: React.FC = () => {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <EmailIcon color="action" />
+                    <EmailIcon aria-hidden="true" color="action" />
                   </InputAdornment>
                 ),
               }}
@@ -159,7 +159,7 @@ export const RegisterPage: React.FC = () => {
 
             <TextField
               {...register('password')}
-              label="סיסמה / كلمة المرور"
+              label={t('auth.password')}
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
               error={!!errors.password}
@@ -167,7 +167,7 @@ export const RegisterPage: React.FC = () => {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <LockIcon color="action" />
+                    <LockIcon aria-hidden="true" color="action" />
                   </InputAdornment>
                 ),
                 endAdornment: (
@@ -175,7 +175,7 @@ export const RegisterPage: React.FC = () => {
                     <IconButton
                       onClick={() => setShowPassword((prev) => !prev)}
                       edge="end"
-                      aria-label="toggle password visibility"
+                      aria-label={t('auth.togglePasswordVisibility')}
                     >
                       {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                     </IconButton>
@@ -186,7 +186,7 @@ export const RegisterPage: React.FC = () => {
 
             <TextField
               {...register('confirmPassword')}
-              label="אימות סיסמה / تأكيد كلمة المرور"
+              label={t('auth.confirmPassword')}
               type={showConfirmPassword ? 'text' : 'password'}
               autoComplete="new-password"
               error={!!errors.confirmPassword}
@@ -194,7 +194,7 @@ export const RegisterPage: React.FC = () => {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <LockIcon color="action" />
+                    <LockIcon aria-hidden="true" color="action" />
                   </InputAdornment>
                 ),
                 endAdornment: (
@@ -202,7 +202,7 @@ export const RegisterPage: React.FC = () => {
                     <IconButton
                       onClick={() => setShowConfirmPassword((prev) => !prev)}
                       edge="end"
-                      aria-label="toggle confirm password visibility"
+                      aria-label={t('auth.togglePasswordVisibility')}
                     >
                       {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                     </IconButton>
@@ -221,16 +221,16 @@ export const RegisterPage: React.FC = () => {
               {isSubmitting ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
-                'הירשם / تسجيل'
+                t('auth.registerButton')
               )}
             </Button>
           </Box>
 
           <Box sx={{ mt: 3, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
-              כבר יש לך חשבון? / هل لديك حساب بالفعل؟{' '}
+              {t('auth.hasAccount')}{' '}
               <Link component={RouterLink} to="/login" color="primary" fontWeight={600}>
-                התחבר / دخول
+                {t('auth.loginButton')}
               </Link>
             </Typography>
           </Box>

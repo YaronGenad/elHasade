@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
+from app.core.logging import get_logger
 from app.db.session import get_db
 from app.models.user import User
 from app.services.search import (
@@ -22,6 +23,7 @@ from app.services.search import (
 )
 
 router = APIRouter()
+log = get_logger("app.api.search")
 
 
 @router.get("/")
@@ -55,6 +57,7 @@ def search_similar(
         threshold=threshold,
     )
 
+    log.info("search_complete", query=query_text, results_count=len(results), top_k=top_k, threshold=threshold)
     return {
         "query": query_text,
         "threshold": threshold,

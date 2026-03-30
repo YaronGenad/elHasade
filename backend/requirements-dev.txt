@@ -1,0 +1,17 @@
+# ── Al-Hasade Backend — Development & Testing Dependencies ───────────────────
+# Install: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+# ── Testing ──────────────────────────────────────────────────────────────────
+pytest==7.4.4
+pytest-cov==4.1.0
+pytest-asyncio==0.23.3
+fakeredis==2.23.2
+
+# ── Load Testing ─────────────────────────────────────────────────────────────
+locust==2.20.1
+
+# ── Security Auditing ────────────────────────────────────────────────────────
+pip-audit==2.7.0
+
+# ── Code Quality ─────────────────────────────────────────────────────────────
+ruff==0.1.14

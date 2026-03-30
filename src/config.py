@@ -1,4 +1,14 @@
-from typing import Dict
+from typing import Any, Dict
+
+
+# ─── LLM Configuration ─────────────────────────────────────────────────────────
+GEMINI_MODEL: str = "models/gemini-flash-latest"
+GEMINI_MAX_RETRIES: int = 3
+GEMINI_RATE_LIMIT_BACKOFF_BASE: int = 20  # seconds, multiplied by (attempt + 1)
+
+# ─── Pipeline Configuration ─────────────────────────────────────────────────────
+SAFE_NAME_MAX_LENGTH: int = 50
+DEFAULT_ROUNDS: int = 4
 
 GRADE_LEVELS = {
     "א-ב": {

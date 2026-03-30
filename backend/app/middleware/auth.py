@@ -1,13 +1,14 @@
-import logging
-
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.security.utils import get_authorization_scheme_param
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
+import structlog
+
+from app.core.logging import get_logger
 from app.core.security import verify_token
 
-logger = logging.getLogger(__name__)
+log = get_logger("app.middleware.auth")
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -47,9 +48,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             
             # Attach user info to request state for use in endpoints
             request.state.user_id = user_id
+            # Bind to structlog so every log line includes user_id
+            structlog.contextvars.bind_contextvars(user_id=user_id)
             
         except Exception as e:
-            logger.warning(f"Authentication failed: {str(e)}")
+            log.warning("auth_failed", path=request.url.path, error=str(e))
             # Let endpoint handle authentication errors
             pass
         

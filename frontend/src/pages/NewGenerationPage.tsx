@@ -12,30 +12,32 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Slider from '@mui/material/Slider';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
 import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
-import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
+import Skeleton from '@mui/material/Skeleton';
 import Tooltip from '@mui/material/Tooltip';
 import SendIcon from '@mui/icons-material/Send';
 import SearchIcon from '@mui/icons-material/Search';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { useTranslation } from 'react-i18next';
 import { submitGeneration } from '../api/generations';
 import { searchSimilar } from '../api/search';
+import { getErrorMessage } from '../api/client';
 import { StatusChip } from '../components/StatusChip';
 import { useDebounce } from '../hooks/useDebounce';
 import { AxiosError } from 'axios';
 
+/** Strip HTML tags and trim whitespace to prevent XSS payloads reaching the API. */
+const sanitize = (val: string) => val.replace(/<[^>]*>/g, '').trim();
+
 const generationSchema = z.object({
-  subject: z.string().min(1, 'שדה חובה / حقل مطلوب'),
-  topic: z.string().min(1, 'שדה חובה / حقل مطلوب'),
-  grade: z.string().min(1, 'שדה חובה / حقل مطلوب'),
+  subject: z.string().min(1, 'שדה חובה / حقل مطلوب').max(200, 'ערך ארוך מדי / القيمة طويلة جداً').transform(sanitize),
+  topic: z.string().min(1, 'שדה חובה / حقل مطلوب').max(200, 'ערך ארוך מדי / القيمة طويلة جداً').transform(sanitize),
+  grade: z.string().min(1, 'שדה חובה / حقل مطلוب').max(50, 'ערך ארוך מדי / القيمة طويلة جداً').transform(sanitize),
   rounds: z.number().min(1).max(10),
-  force_new: z.boolean(),
 });
 
 type GenerationFormData = z.infer<typeof generationSchema>;
@@ -43,6 +45,7 @@ type GenerationFormData = z.infer<typeof generationSchema>;
 const formatSimilarityScore = (score: number) => `${Math.round(score * 100)}%`;
 
 export const NewGenerationPage: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,7 +60,6 @@ export const NewGenerationPage: React.FC = () => {
     resolver: zodResolver(generationSchema),
     defaultValues: {
       rounds: 4,
-      force_new: false,
     },
   });
 
@@ -88,11 +90,7 @@ export const NewGenerationPage: React.FC = () => {
       const response = await submitGeneration(data);
       navigate(`/generations/${response.generation_id}`);
     } catch (err) {
-      const axiosErr = err as AxiosError<{ detail?: string }>;
-      setErrorMessage(
-        axiosErr.response?.data?.detail ??
-          'שגיאה בשליחת הבקשה. אנא נסה שוב. / خطأ في إرسال الطلب. الرجاء المحاولة مرة أخرى.'
-      );
+      setErrorMessage(getErrorMessage(err as AxiosError));
     }
   };
 
@@ -103,10 +101,10 @@ export const NewGenerationPage: React.FC = () => {
       {/* Page header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" fontWeight={700}>
-          יצירת חומרי לימוד חדשים / إنشاء مواد تعليمية جديدة
+          {t('generation.createTitle')}
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
-          מלא את הפרטים ליצירת חומרי לימוד מותאמים אישית / أدخل التفاصيل لإنشاء مواد تعليمية مخصصة
+          {t('generation.createSubtitle')}
         </Typography>
       </Box>
 
@@ -130,8 +128,8 @@ export const NewGenerationPage: React.FC = () => {
                 {/* Subject */}
                 <TextField
                   {...register('subject')}
-                  label="נושא / موضوع"
-                  placeholder="לדוגמה: מתמטיקה / مثال: رياضيات"
+                  label={t('generation.subject')}
+                  placeholder={t('generation.subjectPlaceholder')}
                   error={!!errors.subject}
                   helperText={errors.subject?.message}
                   autoFocus
@@ -140,8 +138,8 @@ export const NewGenerationPage: React.FC = () => {
                 {/* Topic */}
                 <TextField
                   {...register('topic')}
-                  label="נושא משנה / الموضوع الفرعي"
-                  placeholder="לדוגמה: שברים / مثال: الكسور"
+                  label={t('generation.topic')}
+                  placeholder={t('generation.topicPlaceholder')}
                   error={!!errors.topic}
                   helperText={errors.topic?.message}
                 />
@@ -149,8 +147,8 @@ export const NewGenerationPage: React.FC = () => {
                 {/* Grade */}
                 <TextField
                   {...register('grade')}
-                  label="כיתה / الصف"
-                  placeholder="לדוגמה: כיתה ה / مثال: الصف الخامس"
+                  label={t('generation.grade')}
+                  placeholder={t('generation.gradePlaceholder')}
                   error={!!errors.grade}
                   helperText={errors.grade?.message}
                 />
@@ -159,9 +157,9 @@ export const NewGenerationPage: React.FC = () => {
                 <Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                     <Typography variant="body2" fontWeight={500}>
-                      מספר סבבים / عدد الجولات
+                      {t('generation.rounds')}
                     </Typography>
-                    <Tooltip title="כל סבב כולל פעילויות קריאה ומשימות / كل جولة تتضمن أنشطة قراءة ومهام">
+                    <Tooltip title={t('generation.roundsTooltip')}>
                       <InfoOutlinedIcon fontSize="small" color="action" sx={{ cursor: 'help' }} />
                     </Tooltip>
                   </Box>
@@ -189,35 +187,6 @@ export const NewGenerationPage: React.FC = () => {
                   </Box>
                 </Box>
 
-                <Divider />
-
-                {/* Force new checkbox */}
-                <Controller
-                  name="force_new"
-                  control={control}
-                  render={({ field }) => (
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          {...field}
-                          checked={field.value}
-                          color="primary"
-                        />
-                      }
-                      label={
-                        <Box>
-                          <Typography variant="body2" fontWeight={500}>
-                            אל תשתמש במטמון / تجاهل الذاكرة المؤقتة
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            צור חומרים חדשים גם אם קיים תוכן דומה / إنشاء محتوى جديد حتى لو وُجد محتوى مشابه
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                  )}
-                />
-
                 {/* Submit button */}
                 <Button
                   type="submit"
@@ -228,8 +197,8 @@ export const NewGenerationPage: React.FC = () => {
                   sx={{ py: 1.5, mt: 1 }}
                 >
                   {isSubmitting
-                    ? 'שולח... / جارٍ الإرسال...'
-                    : 'צור חומרי לימוד / إنشاء المواد التعليمية'}
+                    ? t('generation.submitting')
+                    : t('generation.submitButton')}
                 </Button>
               </Box>
             </CardContent>
@@ -243,27 +212,44 @@ export const NewGenerationPage: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <SearchIcon color="primary" />
                 <Typography variant="h6">
-                  תוצאות דומות / نتائج مشابهة
+                  {t('generation.similarResults')}
                 </Typography>
-                {isSearching && <CircularProgress size={16} />}
+                {isSearching && <CircularProgress size={16} sx={{ ml: 1 }} />}
               </Box>
 
               {debouncedSearchQuery.trim().length <= 3 && (
                 <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                  הזן נושא, נושא משנה וכיתה כדי לחפש תוצאות דומות / أدخل الموضوع والصف للبحث عن نتائج مشابهة
+                  {t('generation.similarHint')}
                 </Typography>
+              )}
+
+              {isSearching && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Card key={i} variant="outlined">
+                      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                        <Skeleton variant="text" width="60%" height={24} />
+                        <Skeleton variant="text" width="80%" height={20} sx={{ mt: 0.5 }} />
+                        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                          <Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 4 }} />
+                          <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 4 }} />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
               )}
 
               {debouncedSearchQuery.trim().length > 3 && !isSearching && !hasSimilarResults && (
                 <Alert severity="info" icon={false} sx={{ borderRadius: 2 }}>
-                  לא נמצאו חומרים דומים / لا توجد مواد مشابهة
+                  {t('generation.noSimilar')}
                 </Alert>
               )}
 
               {hasSimilarResults && (
                 <>
                   <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
-                    נמצאו {searchData!.count} תוצאות דומות! / وُجدت {searchData!.count} نتائج مشابهة!
+                    {t('generation.foundSimilar', { count: searchData!.count })}
                   </Alert>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     {searchData!.results.map((result) => (
@@ -298,7 +284,7 @@ export const NewGenerationPage: React.FC = () => {
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
                             <Box sx={{ display: 'flex', gap: 0.5 }}>
                               <Chip label={result.grade} size="small" variant="outlined" />
-                              <Chip label={`${result.rounds} סבבים`} size="small" variant="outlined" />
+                              <Chip label={t('generation.roundsLabel', { rounds: result.rounds })} size="small" variant="outlined" />
                             </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <StatusChip status={result.status} />

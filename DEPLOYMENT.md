@@ -332,4 +332,4 @@ Target: p95 < 500ms for `/generations/` (submit), p95 < 50ms for `/search/`.
 
 ---
 
-*Last updated: 2026-03-28 | Sprint 6*
+*Last updated: 2026-03-29 | Sprint 9 — Documentation Sync*

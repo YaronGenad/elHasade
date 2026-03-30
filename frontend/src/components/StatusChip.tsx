@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import Chip, { ChipProps } from '@mui/material/Chip';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
@@ -37,15 +38,17 @@ const statusConfig: Record<
 };
 
 export const StatusChip: React.FC<StatusChipProps> = ({ status, size = 'small' }) => {
+  const { t } = useTranslation();
   const config = statusConfig[status] ?? {
     label: status,
     color: 'default' as ChipProps['color'],
     icon: <HourglassEmptyIcon fontSize="small" />,
   };
+  const label = status in statusConfig ? t(`status.${status}`) : status;
 
   return (
     <Chip
-      label={config.label}
+      label={label}
       color={config.color}
       size={size}
       icon={config.icon}

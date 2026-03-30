@@ -23,15 +23,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # ── pgvector extension ────────────────────────────────────────────────────
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    dialect = op.get_context().dialect.name
 
-    # ── materials: denormalised search fields ─────────────────────────────────
+    # ── materials: denormalised search fields (all dialects) ──────────────────
     op.add_column("materials", sa.Column("subject", sa.String(100), nullable=True))
     op.add_column("materials", sa.Column("topic", sa.String(255), nullable=True))
     op.add_column("materials", sa.Column("grade", sa.String(20), nullable=True))
 
-    # ── materials: approval / usage counters ──────────────────────────────────
+    # ── materials: approval / usage counters (all dialects) ───────────────────
     op.add_column(
         "materials",
         sa.Column("approval_count", sa.Integer(), nullable=False, server_default="0"),
@@ -41,58 +40,72 @@ def upgrade() -> None:
         sa.Column("times_served", sa.Integer(), nullable=False, server_default="0"),
     )
 
-    # ── materials: embedding + fts_vector (Postgres-native types via raw SQL) ─
-    op.execute("ALTER TABLE materials ADD COLUMN IF NOT EXISTS embedding vector(768)")
-    op.execute("ALTER TABLE materials ADD COLUMN IF NOT EXISTS fts_vector tsvector")
-
-    # ── users: school ─────────────────────────────────────────────────────────
+    # ── users: school (all dialects) ──────────────────────────────────────────
     op.add_column("users", sa.Column("school", sa.String(200), nullable=True))
 
-    # ── indexes ───────────────────────────────────────────────────────────────
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_materials_fts "
-        "ON materials USING gin(fts_vector)"
-    )
-    # HNSW works on any dataset size (unlike ivfflat which needs rows for centroids)
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_materials_vec "
-        "ON materials USING hnsw(embedding vector_cosine_ops)"
-    )
+    if dialect == "postgresql":
+        # pgvector extension
+        op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-    # ── trigger: auto-update fts_vector from subject/topic/grade ─────────────
-    op.execute(
-        """
-        CREATE OR REPLACE FUNCTION update_material_fts_vector()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            NEW.fts_vector := to_tsvector(
-                'simple',
-                COALESCE(NEW.subject, '') || ' ' ||
-                COALESCE(NEW.topic,   '') || ' ' ||
-                COALESCE(NEW.grade,   '')
-            );
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql
-        """
-    )
-    op.execute(
-        """
-        CREATE OR REPLACE TRIGGER materials_fts_trigger
-            BEFORE INSERT OR UPDATE ON materials
-            FOR EACH ROW EXECUTE FUNCTION update_material_fts_vector()
-        """
-    )
+        # Postgres-native column types
+        op.execute("ALTER TABLE materials ADD COLUMN IF NOT EXISTS embedding vector(768)")
+        op.execute("ALTER TABLE materials ADD COLUMN IF NOT EXISTS fts_vector tsvector")
+
+        # Indexes
+        op.execute(
+            "CREATE INDEX IF NOT EXISTS idx_materials_fts "
+            "ON materials USING gin(fts_vector)"
+        )
+        op.execute(
+            "CREATE INDEX IF NOT EXISTS idx_materials_vec "
+            "ON materials USING hnsw(embedding vector_cosine_ops)"
+        )
+
+        # Trigger: auto-update fts_vector on insert/update
+        op.execute(
+            """
+            CREATE OR REPLACE FUNCTION update_material_fts_vector()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                NEW.fts_vector := to_tsvector(
+                    'simple',
+                    COALESCE(NEW.subject, '') || ' ' ||
+                    COALESCE(NEW.topic,   '') || ' ' ||
+                    COALESCE(NEW.grade,   '')
+                );
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql
+            """
+        )
+        op.execute(
+            """
+            CREATE OR REPLACE TRIGGER materials_fts_trigger
+                BEFORE INSERT OR UPDATE ON materials
+                FOR EACH ROW EXECUTE FUNCTION update_material_fts_vector()
+            """
+        )
+    else:
+        # SQLite fallback: TEXT columns (no vector search, no FTS trigger)
+        op.add_column("materials", sa.Column("embedding", sa.Text(), nullable=True))
+        op.add_column("materials", sa.Column("fts_vector", sa.Text(), nullable=True))
 
 
 def downgrade() -> None:
-    op.execute("DROP TRIGGER IF EXISTS materials_fts_trigger ON materials")
-    op.execute("DROP FUNCTION IF EXISTS update_material_fts_vector()")
-    op.execute("DROP INDEX IF EXISTS idx_materials_vec")
-    op.execute("DROP INDEX IF EXISTS idx_materials_fts")
+    dialect = op.get_context().dialect.name
+
+    if dialect == "postgresql":
+        op.execute("DROP TRIGGER IF EXISTS materials_fts_trigger ON materials")
+        op.execute("DROP FUNCTION IF EXISTS update_material_fts_vector()")
+        op.execute("DROP INDEX IF EXISTS idx_materials_vec")
+        op.execute("DROP INDEX IF EXISTS idx_materials_fts")
+        op.execute("ALTER TABLE materials DROP COLUMN IF EXISTS fts_vector")
+        op.execute("ALTER TABLE materials DROP COLUMN IF EXISTS embedding")
+    else:
+        op.drop_column("materials", "fts_vector")
+        op.drop_column("materials", "embedding")
+
     op.drop_column("users", "school")
-    op.execute("ALTER TABLE materials DROP COLUMN IF EXISTS fts_vector")
-    op.execute("ALTER TABLE materials DROP COLUMN IF EXISTS embedding")
     op.drop_column("materials", "times_served")
     op.drop_column("materials", "approval_count")
     op.drop_column("materials", "grade")

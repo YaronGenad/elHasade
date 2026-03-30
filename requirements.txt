@@ -1,5 +1,12 @@
+# ── Root requirements — generation pipeline (src/) ───────────────────────────
+# These are used by src/pipeline.py, src/gemini.py, src/pdf.py
+# For backend (FastAPI app) deps, see backend/requirements.txt
+#
+# Install: pip install -r requirements.txt
+
 google-genai>=1.0.0
 jinja2>=3.0.0
 playwright>=1.40.0
 pypdf>=4.0.0
 python-dotenv>=1.0.0
+structlog>=24.0.0

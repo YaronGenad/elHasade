@@ -21,6 +21,9 @@ from typing import Any, Dict, List, Optional
 import redis
 
 from app.core.config import settings
+from app.core.logging import get_logger
+
+log = get_logger("app.services.cache")
 
 # ── TTLs ──────────────────────────────────────────────────────────────────────
 UNIT_TTL = 7 * 24 * 3600       # 7 days  — unit ID lists
@@ -36,7 +39,8 @@ def _make_redis_client(url: str) -> Optional[redis.Redis]:
         )
         client.ping()
         return client
-    except Exception:
+    except (redis.RedisError, OSError) as exc:
+        log.warning("redis_connect_failed", url=url, error=str(exc))
         return None
 
 
@@ -81,7 +85,11 @@ class CacheService:
         try:
             raw = self._client.get(self._unit_key(subject, topic, grade))
             return json.loads(raw) if raw else None
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_get_unit_ids_failed", key=self._unit_key(subject, topic, grade), error=str(exc))
+            return None
+        except (json.JSONDecodeError, TypeError) as exc:
+            log.warning("cache_get_unit_ids_decode_failed", key=self._unit_key(subject, topic, grade), error=str(exc))
             return None
 
     def set_unit_ids(
@@ -97,7 +105,8 @@ class CacheService:
                 json.dumps(ids).encode("utf-8"),
             )
             return True
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_set_unit_ids_failed", key=self._unit_key(subject, topic, grade), error=str(exc))
             return False
 
     def invalidate_unit_ids(self, subject: str, topic: str, grade: str) -> bool:
@@ -107,7 +116,8 @@ class CacheService:
         try:
             self._client.delete(self._unit_key(subject, topic, grade))
             return True
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_invalidate_unit_ids_failed", key=self._unit_key(subject, topic, grade), error=str(exc))
             return False
 
     # ── hot units sorted set ──────────────────────────────────────────────────
@@ -125,8 +135,8 @@ class CacheService:
             self._client.zincrby("hot:units:top50", 1, key)
             # Keep only top 50
             self._client.zremrangebyrank("hot:units:top50", 0, -51)
-        except Exception:
-            pass
+        except redis.RedisError as exc:
+            log.warning("cache_update_hot_units_failed", error=str(exc))
 
     # ── async generation status ───────────────────────────────────────────────
 
@@ -136,7 +146,11 @@ class CacheService:
         try:
             raw = self._client.get(f"gen:status:{job_id}")
             return json.loads(raw) if raw else None
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_get_gen_status_failed", job_id=job_id, error=str(exc))
+            return None
+        except (json.JSONDecodeError, TypeError) as exc:
+            log.warning("cache_get_gen_status_decode_failed", job_id=job_id, error=str(exc))
             return None
 
     def set_gen_status(self, job_id: str, status_data: Dict[str, Any]) -> bool:
@@ -149,7 +163,8 @@ class CacheService:
                 json.dumps(status_data, default=str).encode("utf-8"),
             )
             return True
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_set_gen_status_failed", job_id=job_id, error=str(exc))
             return False
 
     # ── legacy exact-hash query cache ─────────────────────────────────────────
@@ -161,7 +176,11 @@ class CacheService:
         try:
             raw = self._client.get(f"query:{query_hash}")
             return json.loads(raw) if raw else None
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_get_query_failed", query_hash=query_hash, error=str(exc))
+            return None
+        except (json.JSONDecodeError, TypeError) as exc:
+            log.warning("cache_get_query_decode_failed", query_hash=query_hash, error=str(exc))
             return None
 
     def cache_query(self, query_hash: str, result: Dict[str, Any]) -> bool:
@@ -174,7 +193,8 @@ class CacheService:
                 json.dumps(result, default=str).encode("utf-8"),
             )
             return True
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_set_query_failed", query_hash=query_hash, error=str(exc))
             return False
 
     def invalidate_query(self, query_hash: str) -> bool:
@@ -183,7 +203,8 @@ class CacheService:
         try:
             self._client.delete(f"query:{query_hash}")
             return True
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_invalidate_query_failed", query_hash=query_hash, error=str(exc))
             return False
 
     # ── material metadata cache ───────────────────────────────────────────────
@@ -194,7 +215,11 @@ class CacheService:
         try:
             raw = self._client.get(f"material:{material_id}")
             return json.loads(raw) if raw else None
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_get_material_failed", material_id=material_id, error=str(exc))
+            return None
+        except (json.JSONDecodeError, TypeError) as exc:
+            log.warning("cache_get_material_decode_failed", material_id=material_id, error=str(exc))
             return None
 
     def cache_material(self, material_id: str, content: Dict[str, Any]) -> bool:
@@ -207,5 +232,6 @@ class CacheService:
                 json.dumps(content, default=str).encode("utf-8"),
             )
             return True
-        except Exception:
+        except redis.RedisError as exc:
+            log.warning("cache_set_material_failed", material_id=material_id, error=str(exc))
             return False

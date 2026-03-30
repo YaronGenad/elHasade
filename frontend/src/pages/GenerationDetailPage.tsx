@@ -1,18 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import ButtonGroup from '@mui/material/ButtonGroup';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
 import Grid from '@mui/material/Grid';
 import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
-import Snackbar from '@mui/material/Snackbar';
 import CircularProgress from '@mui/material/CircularProgress';
 import LinearProgress from '@mui/material/LinearProgress';
 import Divider from '@mui/material/Divider';
@@ -32,10 +30,14 @@ import RepeatIcon from '@mui/icons-material/Repeat';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { useTranslation } from 'react-i18next';
 import { getGeneration, downloadFile, submitGeneration } from '../api/generations';
 import { approveMaterial, rejectMaterial, getMaterialVersions } from '../api/materials';
 import { StatusChip } from '../components/StatusChip';
+import { useNotification } from '../hooks/useNotification';
+import { getErrorMessage } from '../api/client';
 import { MaterialVersionItem } from '../types';
+import { AxiosError } from 'axios';
 
 // File type definitions per round
 interface FileDefinition {
@@ -106,36 +108,43 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({ generationId, fileType,
       size="small"
       onClick={handleDownload}
       disabled={isDownloading}
+      aria-label={label}
       startIcon={
         isDownloading ? <CircularProgress size={14} /> : <DownloadIcon fontSize="small" />
       }
       sx={{ minWidth: 140 }}
     >
-      {error ? 'שגיאה / خطأ' : label}
+      {label}
     </Button>
   );
 };
 
 export const GenerationDetailPage: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const { notifySuccess, notifyError } = useNotification();
   const [approvalLoading, setApprovalLoading] = useState(false);
-  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
-    open: false,
-    message: '',
-    severity: 'success',
-  });
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [progressInfo, setProgressInfo] = useState<{ pct: number; stage: string }>({ pct: 0, stage: '' });
+  const viewStartRef = React.useRef<number | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['generation', id],
     queryFn: () => getGeneration(id!),
     enabled: !!id,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(2000 * 2 ** attemptIndex, 20000),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === 'pending' || status === 'processing' ? 5_000 : false;
+      if (status === 'pending' || status === 'processing') {
+        // Backoff: start at 5s, grow if the query has been failing
+        const errorCount = query.state.fetchFailureCount;
+        return Math.min(5000 * (1 + errorCount), 30000);
+      }
+      return false;
     },
     staleTime: 2_000,
   });
@@ -152,19 +161,57 @@ export const GenerationDetailPage: React.FC = () => {
   const versions: MaterialVersionItem[] = versionsData?.versions ?? [];
   const effectiveMaterialId = selectedVersionId ?? data?.material_id ?? null;
 
-  const showToast = (message: string, severity: 'success' | 'error') => {
-    setToast({ open: true, message, severity });
-  };
+  const isActive = data?.status === 'pending' || data?.status === 'processing';
+
+  // Progress estimation — counts from when the user first opens this page,
+  // not from created_at (which could be hours old for stuck/resumed generations).
+  useEffect(() => {
+    if (!isActive) {
+      viewStartRef.current = null;
+      return;
+    }
+
+    // Record the moment we first see an active generation
+    if (viewStartRef.current === null) {
+      viewStartRef.current = Date.now();
+    }
+
+    const rounds = data?.rounds ?? 1;
+    // Measured: ~120s per round on Gemini Flash. Add 20s overhead for roadmap + save.
+    const totalEstimated = 20 + rounds * 120;
+
+    // Stage thresholds as fraction of totalEstimated.
+    // Stations build (stage2) is the long part → 15% to 85%.
+    const STAGES = [
+      { threshold: 0,    label: t('detail.progressStage0') },  // 0–5%:  waiting
+      { threshold: 0.05, label: t('detail.progressStage1') },  // 5–15%: roadmap
+      { threshold: 0.15, label: t('detail.progressStage2') },  // 15–85%: stations (bulk)
+      { threshold: 0.85, label: t('detail.progressStage3') },  // 85–95%: PDF
+      { threshold: 0.95, label: t('detail.progressStage4') },  // 95–99%: saving
+    ];
+
+    const compute = () => {
+      const elapsed = (Date.now() - viewStartRef.current!) / 1000;
+      const fraction = Math.min(0.99, Math.max(0, elapsed / totalEstimated));
+      const pct = Math.round(fraction * 100);
+      const stage = [...STAGES].reverse().find(s => fraction >= s.threshold)?.label ?? STAGES[0].label;
+      setProgressInfo({ pct, stage });
+    };
+
+    compute();
+    const interval = setInterval(compute, 1000);
+    return () => clearInterval(interval);
+  }, [isActive, data?.rounds, t]);
 
   const handleApprove = async () => {
     if (!effectiveMaterialId) return;
     setApprovalLoading(true);
     try {
       await approveMaterial(effectiveMaterialId);
-      showToast('היחידה נשמרה ותוצג למורים נוספים ✓', 'success');
+      notifySuccess(t('detail.approved'));
       queryClient.invalidateQueries({ queryKey: ['materialVersions'] });
-    } catch {
-      showToast('שגיאה בשמירה', 'error');
+    } catch (err) {
+      notifyError(getErrorMessage(err as AxiosError));
     } finally {
       setApprovalLoading(false);
     }
@@ -175,17 +222,18 @@ export const GenerationDetailPage: React.FC = () => {
     setApprovalLoading(true);
     try {
       await rejectMaterial(effectiveMaterialId);
-      // Re-generate with force_new=true
+      // Use cache if other versions exist; only generate fresh when cache is exhausted
+      const hasOtherVersions = versions.some(v => v.material_id !== effectiveMaterialId);
       const res = await submitGeneration({
         subject: data!.subject,
         topic: data!.topic,
         grade: data!.grade,
         rounds: data!.rounds,
-        force_new: true,
+        force_new: !hasOtherVersions,
       });
       navigate(`/generations/${res.generation_id}`);
-    } catch {
-      showToast('שגיאה ביצירת גרסה חדשה', 'error');
+    } catch (err) {
+      notifyError(getErrorMessage(err as AxiosError));
       setApprovalLoading(false);
     }
   };
@@ -193,7 +241,7 @@ export const GenerationDetailPage: React.FC = () => {
   if (!id) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error">מזהה לא תקין / معرف غير صالح</Alert>
+        <Alert severity="error" role="alert">{t('detail.invalidId')}</Alert>
       </Container>
     );
   }
@@ -201,17 +249,16 @@ export const GenerationDetailPage: React.FC = () => {
   if (isError) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          שגיאה בטעינת הנתונים / خطأ في تحميل البيانات
+        <Alert severity="error" sx={{ mb: 2 }} role="alert">
+          {t('dashboard.loadError')}
         </Alert>
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/dashboard')}>
-          חזרה ללוח הבקרה / العودة للوحة التحكم
+          {t('common.backToDashboard')}
         </Button>
       </Container>
     );
   }
 
-  const isActive = data?.status === 'pending' || data?.status === 'processing';
   const isCompleted = data?.status === 'completed';
   const isFailed = data?.status === 'failed';
 
@@ -224,7 +271,7 @@ export const GenerationDetailPage: React.FC = () => {
         sx={{ mb: 3 }}
         color="inherit"
       >
-        חזרה ללוח הבקרה / العودة للوحة التحكم
+        {t('common.backToDashboard')}
       </Button>
 
       {/* Header card */}
@@ -257,7 +304,7 @@ export const GenerationDetailPage: React.FC = () => {
                     <ClassIcon color="primary" fontSize="small" />
                     <Box>
                       <Typography variant="caption" color="text.secondary">
-                        כיתה / الصف
+                        {t('detail.grade')}
                       </Typography>
                       <Typography variant="body2" fontWeight={500}>
                         {data?.grade}
@@ -270,7 +317,7 @@ export const GenerationDetailPage: React.FC = () => {
                     <RepeatIcon color="primary" fontSize="small" />
                     <Box>
                       <Typography variant="caption" color="text.secondary">
-                        סבבים / الجولات
+                        {t('detail.rounds')}
                       </Typography>
                       <Typography variant="body2" fontWeight={500}>
                         {data?.rounds}
@@ -281,7 +328,7 @@ export const GenerationDetailPage: React.FC = () => {
                 <Grid item xs={6} sm={3}>
                   <Box>
                     <Typography variant="caption" color="text.secondary">
-                      נוצר ב / تاريخ الإنشاء
+                      {t('detail.createdAt')}
                     </Typography>
                     <Typography variant="body2" fontWeight={500}>
                       {formatDate(data?.created_at)}
@@ -292,7 +339,7 @@ export const GenerationDetailPage: React.FC = () => {
                   <Grid item xs={6} sm={3}>
                     <Box>
                       <Typography variant="caption" color="text.secondary">
-                        הושלם ב / تاريخ الاكتمال
+                        {t('detail.completedAt')}
                       </Typography>
                       <Typography variant="body2" fontWeight={500}>
                         {formatDate(data.completed_at)}
@@ -309,17 +356,29 @@ export const GenerationDetailPage: React.FC = () => {
       {/* Processing / pending state */}
       {isActive && (
         <Card sx={{ mb: 3 }}>
-          <CardContent sx={{ p: 3, textAlign: 'center' }}>
-            <CircularProgress size={48} sx={{ mb: 2 }} />
-            <Typography variant="h6" gutterBottom>
-              {data?.status === 'pending'
-                ? 'ממתין לעיבוד... / في انتظار المعالجة...'
-                : 'מעבד חומרי לימוד... / جارٍ معالجة المواد التعليمية...'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              הדף יתעדכן אוטומטית כל 5 שניות / ستتحدث الصفحة تلقائياً كل 5 ثوانٍ
-            </Typography>
-            <LinearProgress color="primary" sx={{ borderRadius: 2, height: 6 }} />
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+              <CircularProgress size={32} />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h6">
+                  {progressInfo.stage || (data?.status === 'pending' ? t('detail.pending') : t('detail.processing'))}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {t('detail.autoRefresh')}
+                </Typography>
+              </Box>
+              <Typography variant="h6" fontWeight={700} color="primary" sx={{ minWidth: 48, textAlign: 'right' }}>
+                {progressInfo.pct}%
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={progressInfo.pct}
+              color="primary"
+              sx={{ borderRadius: 2, height: 8 }}
+              aria-busy={true}
+              aria-valuenow={progressInfo.pct}
+            />
           </CardContent>
         </Card>
       )}
@@ -331,7 +390,7 @@ export const GenerationDetailPage: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
               <ErrorOutlineIcon color="error" fontSize="large" />
               <Typography variant="h6" color="error">
-                היצירה נכשלה / فشل الإنشاء
+                {t('detail.failed')}
               </Typography>
             </Box>
             {data?.error && (
@@ -354,7 +413,7 @@ export const GenerationDetailPage: React.FC = () => {
               onClick={() => navigate('/generate')}
               sx={{ mt: 2 }}
             >
-              נסה שוב / حاول مرة أخرى
+              {t('detail.retry')}
             </Button>
           </CardContent>
         </Card>
@@ -367,14 +426,14 @@ export const GenerationDetailPage: React.FC = () => {
           <Card sx={{ mb: 3, border: '2px solid', borderColor: 'primary.light' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight={600} gutterBottom>
-                מה דעתך על היחידה? / ما رأيك في الوحدة؟
+                {t('detail.reviewTitle')}
               </Typography>
 
               {/* Version selector (shown when multiple versions exist) */}
               {versions.length > 1 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    גרסאות קיימות / الإصدارات المتاحة:
+                    {t('detail.versionsTitle')}
                   </Typography>
                   <ToggleButtonGroup
                     value={effectiveMaterialId}
@@ -384,7 +443,7 @@ export const GenerationDetailPage: React.FC = () => {
                   >
                     {versions.map((v) => (
                       <ToggleButton key={v.material_id} value={v.material_id}>
-                        גרסה {v.version} ({v.approval_count} אישורים)
+                        {t('detail.version', { version: v.version, count: v.approval_count })}
                       </ToggleButton>
                     ))}
                   </ToggleButtonGroup>
@@ -401,7 +460,7 @@ export const GenerationDetailPage: React.FC = () => {
                   disabled={approvalLoading || !effectiveMaterialId}
                   onClick={handleApprove}
                 >
-                  ✓ מצוין, שמור / ممتاز، احفظ
+                  {t('detail.approve')}
                 </Button>
 
                 <Button
@@ -413,18 +472,9 @@ export const GenerationDetailPage: React.FC = () => {
                   disabled={approvalLoading || !effectiveMaterialId}
                   onClick={handleReject}
                 >
-                  ↺ רוצה גרסה אחרת / أريد إصداراً آخر
+                  {t('detail.reject')}
                 </Button>
 
-                <Button
-                  variant="text"
-                  color="inherit"
-                  startIcon={<DownloadIcon />}
-                  disabled={approvalLoading}
-                  onClick={() => data && downloadFile(data.generation_id, 'student_pdf')}
-                >
-                  ⬇ הורד בלי לאשר / تنزيل بدون موافقة
-                </Button>
               </Box>
             </CardContent>
           </Card>
@@ -435,21 +485,24 @@ export const GenerationDetailPage: React.FC = () => {
               avatar={<MenuBookIcon color="primary" />}
               title={
                 <Typography variant="h6" fontWeight={600}>
-                  הורדות כלליות / تنزيلات عامة
+                  {t('detail.globalDownloads')}
                 </Typography>
               }
             />
             <Divider />
             <CardContent>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {GLOBAL_FILES.map((file) => (
-                  <DownloadButton
-                    key={file.key}
-                    generationId={data.generation_id}
-                    fileType={file.key}
-                    label={`${file.label} / ${file.labelAr}`}
-                  />
-                ))}
+                {GLOBAL_FILES.map((file) => {
+                  const fileLabel = i18n.language === 'ar' ? file.labelAr : file.label;
+                  return (
+                    <DownloadButton
+                      key={file.key}
+                      generationId={data.generation_id}
+                      fileType={file.key}
+                      label={fileLabel}
+                    />
+                  );
+                })}
               </Box>
             </CardContent>
           </Card>
@@ -460,7 +513,7 @@ export const GenerationDetailPage: React.FC = () => {
               avatar={<SchoolIcon color="primary" />}
               title={
                 <Typography variant="h6" fontWeight={600}>
-                  הורדות לפי סבב / تنزيلات حسب الجولة
+                  {t('detail.roundDownloads')}
                 </Typography>
               }
             />
@@ -477,20 +530,23 @@ export const GenerationDetailPage: React.FC = () => {
                         sx={{ minWidth: 32 }}
                       />
                       <Typography fontWeight={500}>
-                        סבב {round} / الجولة {round}
+                        {t('detail.round', { num: round })}
                       </Typography>
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-                      {ROUND_FILES.map((file) => (
-                        <DownloadButton
-                          key={file.key}
-                          generationId={data.generation_id}
-                          fileType={`round${round}_${file.key}`}
-                          label={`${file.label} / ${file.labelAr}`}
-                        />
-                      ))}
+                      {ROUND_FILES.map((file) => {
+                        const fileLabel = i18n.language === 'ar' ? file.labelAr : file.label;
+                        return (
+                          <DownloadButton
+                            key={file.key}
+                            generationId={data.generation_id}
+                            fileType={`round${round}_${file.key}`}
+                            label={fileLabel}
+                          />
+                        );
+                      })}
                     </Box>
                   </AccordionDetails>
                 </Accordion>
@@ -504,7 +560,7 @@ export const GenerationDetailPage: React.FC = () => {
               <CardHeader
                 title={
                   <Typography variant="h6" fontWeight={600}>
-                    סיכום תוצאות / ملخص النتائج
+                    {t('detail.resultSummary')}
                   </Typography>
                 }
               />
@@ -546,21 +602,6 @@ export const GenerationDetailPage: React.FC = () => {
         </Card>
       )}
 
-      {/* Toast notification */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-          sx={{ width: '100%' }}
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </Container>
   );
 };

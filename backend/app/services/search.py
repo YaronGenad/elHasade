@@ -15,14 +15,18 @@ import re
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
+from app.core.logging import get_logger
 from app.services.cache import CacheService
 from app.services.embeddings import embed_text, embedding_to_pg_literal
 
+log = get_logger("app.services.search")
+
 # ── constants ─────────────────────────────────────────────────────────────────
 
-DEFAULT_SIMILARITY_THRESHOLD = 0.3   # cosine distance (lower = more similar)
+DEFAULT_SIMILARITY_THRESHOLD = 0.15  # cosine distance (lower = more similar)
 DEFAULT_TOP_K = 5
 
 
@@ -81,7 +85,11 @@ def search_exact(
             ),
             {"q": search_text, "lim": limit},
         ).fetchall()
-    except Exception:
+    except (OperationalError, ProgrammingError) as exc:
+        log.error("search_exact_sql_failed", query=search_text, error=str(exc))
+        return []
+    except Exception as exc:
+        log.error("search_exact_unexpected_error", query=search_text, error=str(exc))
         return []
 
     return [
@@ -137,7 +145,11 @@ def search_similar(
             ),
             {"vec": vec_literal, "threshold": threshold, "lim": limit},
         ).fetchall()
-    except Exception:
+    except (OperationalError, ProgrammingError) as exc:
+        log.error("search_similar_sql_failed", error=str(exc))
+        return []
+    except Exception as exc:
+        log.error("search_similar_unexpected_error", error=str(exc))
         return []
 
     return [
@@ -201,13 +213,9 @@ class SearchService:
         Runs BM25 first; if not enough results, also runs pgvector.
         Returns combined, de-duplicated list limited to top_k.
         """
-        # Parse query_text back into parts (best-effort; used for BM25 subject/topic/grade)
-        parts = query_text.split()
-        subject = parts[0] if len(parts) > 0 else query_text
-        topic = " ".join(parts[1:-1]) if len(parts) > 2 else query_text
-        grade = parts[-1] if len(parts) > 1 else ""
-
-        bm25_results = search_exact(subject, topic, grade, db, limit=top_k)
+        # Pass the full query_text as-is so multi-word Hebrew subjects/topics
+        # are not mangled by splitting.  search_exact normalises internally.
+        bm25_results = search_exact(query_text, "", "", db, limit=top_k)
         seen_ids = {r["material_id"] for r in bm25_results}
 
         # Fill remaining slots with pgvector results

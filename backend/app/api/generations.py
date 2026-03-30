@@ -8,10 +8,12 @@ from fastapi.responses import FileResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.db.session import SessionLocal, get_db
 from app.models.material import Material
 from app.models.query import Query
@@ -25,10 +27,12 @@ from app.schemas.generation import (
 from app.services.cache import CacheService
 from app.services.embeddings import embed_text, embedding_to_pg_literal
 from app.services.generation import GenerationService, create_generation_service
+from app.services.audit import record_audit
 from app.services.search import SearchService, build_query_text, create_search_service
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+log = get_logger("app.api.generations")
 
 
 def process_generation_task(
@@ -46,8 +50,10 @@ def process_generation_task(
     try:
         db_query = db.query(Query).filter(Query.id == query_id).first()
         if not db_query:
+            log.warning("generation_task_query_not_found", query_id=query_id)
             return
 
+        log.info("generation_task_start", query_id=query_id, subject=user_input.get("subject"), topic=user_input.get("topic"))
         db_query.status = "processing"
         db.commit()
 
@@ -58,6 +64,7 @@ def process_generation_task(
         db_query.error_message = result.get("error") if result.get("status") == "failed" else None
 
         if result.get("status") == "completed":
+            log.info("generation_task_completed", query_id=query_id)
             db_query.completed_at = datetime.utcnow()
             material_id = str(uuid.uuid4())
             material = Material(
@@ -73,6 +80,7 @@ def process_generation_task(
             db.add(material)
             db.flush()  # trigger fires → fts_vector populated automatically
 
+            log.info("generation_task_embedding_start", query_id=query_id, material_id=material_id)
             # Compute and store embedding (best-effort; non-blocking on failure)
             embed_input = (
                 f"{user_input.get('subject', '')} "
@@ -91,6 +99,7 @@ def process_generation_task(
 
             db.commit()
 
+            log.info("generation_task_caching", query_id=query_id, query_hash=query_hash)
             cache = CacheService()
             cache.cache_query(query_hash, result)
             # Update unit cache so the next identical request hits Redis
@@ -106,9 +115,11 @@ def process_generation_task(
                 user_input.get("grade", ""),
             )
         else:
+            log.warning("generation_task_failed_result", query_id=query_id, error=result.get("error"))
             db.commit()
 
     except Exception as exc:
+        log.error("generation_task_failed", query_id=query_id, error=str(exc), exc_info=True)
         try:
             db.rollback()
             db_query = db.query(Query).filter(Query.id == query_id).first()
@@ -116,8 +127,8 @@ def process_generation_task(
                 db_query.status = "failed"
                 db_query.error_message = str(exc)
                 db.commit()
-        except Exception:
-            pass
+        except Exception as inner_exc:
+            log.error("generation_task_persist_error_failed", query_id=query_id, error=str(inner_exc), exc_info=True)
     finally:
         db.close()
 
@@ -151,6 +162,7 @@ async def create_generation(
         generation_request.rounds,
     )
 
+    log.info("generation_request", user_id=current_user.id, subject=generation_request.subject, topic=generation_request.topic, grade=generation_request.grade, force_new=generation_request.force_new)
     # ── 1. Redis unit cache hit ───────────────────────────────────────────────
     if not generation_request.force_new:
         cached_ids = cache.get_unit_ids(
@@ -185,12 +197,18 @@ async def create_generation(
                 db.add(db_query)
                 # Increment times_served
                 material.times_served = (material.times_served or 0) + 1
-                db.commit()
+                try:
+                    db.commit()
+                except OperationalError as exc:
+                    db.rollback()
+                    log.error("cache_hit_commit_failed", error=str(exc))
+                    raise HTTPException(status_code=503, detail="Database temporarily unavailable")
                 cache.update_hot_units(
                     generation_request.subject,
                     generation_request.topic,
                     generation_request.grade,
                 )
+                log.info("generation_cache_hit", query_id=db_query.id, material_id=material.id)
                 return GenerationResponse(
                     generation_id=db_query.id,
                     status="completed",
@@ -236,7 +254,12 @@ async def create_generation(
                 )
                 db.add(db_query)
                 material.times_served = (material.times_served or 0) + 1
-                db.commit()
+                try:
+                    db.commit()
+                except OperationalError as exc:
+                    db.rollback()
+                    log.error("bm25_hit_commit_failed", error=str(exc))
+                    raise HTTPException(status_code=503, detail="Database temporarily unavailable")
                 # Warm Redis for next request
                 cache.set_unit_ids(
                     generation_request.subject,
@@ -249,6 +272,7 @@ async def create_generation(
                     generation_request.topic,
                     generation_request.grade,
                 )
+                log.info("generation_bm25_hit", query_id=db_query.id, material_id=material.id)
                 return GenerationResponse(
                     generation_id=db_query.id,
                     status="completed",
@@ -285,7 +309,13 @@ async def create_generation(
                 )
                 db.add(db_query)
                 material.times_served = (material.times_served or 0) + 1
-                db.commit()
+                try:
+                    db.commit()
+                except OperationalError as exc:
+                    db.rollback()
+                    log.error("vector_hit_commit_failed", error=str(exc))
+                    raise HTTPException(status_code=503, detail="Database temporarily unavailable")
+                log.info("generation_vector_hit", query_id=db_query.id, material_id=material.id)
                 return GenerationResponse(
                     generation_id=db_query.id,
                     status="completed",
@@ -320,9 +350,31 @@ async def create_generation(
         status="pending",
     )
     db.add(db_query)
-    db.commit()
-    db.refresh(db_query)
+    try:
+        db.commit()
+        db.refresh(db_query)
+    except OperationalError as exc:
+        db.rollback()
+        log.error("generation_queue_commit_failed", error=str(exc))
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable")
 
+    log.info("generation_queued", query_id=db_query.id, subject=generation_request.subject, topic=generation_request.topic)
+    record_audit(
+        db,
+        action="generate",
+        user_id=current_user.id,
+        resource_id=db_query.id,
+        resource_type="query",
+        details={
+            "subject": generation_request.subject,
+            "topic": generation_request.topic,
+            "grade": generation_request.grade,
+            "rounds": generation_request.rounds,
+            "from_cache": False,
+        },
+        ip_address=request.client.host if request.client else None,
+        request_id=getattr(request.state, "request_id", None),
+    )
     background_tasks.add_task(
         process_generation_task,
         db_query.id,

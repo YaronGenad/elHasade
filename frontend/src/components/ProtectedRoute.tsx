@@ -20,7 +20,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
         alignItems="center"
         minHeight="100vh"
       >
-        <CircularProgress size={48} />
+        <CircularProgress size={48} aria-label="Loading" />
       </Box>
     );
   }

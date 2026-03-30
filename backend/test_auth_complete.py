@@ -8,6 +8,13 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_alhasade_complete.db")
 os.environ.setdefault("AUTH_RATE_LIMIT", "1000/minute")
 os.environ.setdefault("GENERATION_RATE_LIMIT", "1000/minute")
 
+# Remove existing test database file to ensure clean state (before any imports open it)
+try:
+    if os.path.exists("./test_alhasade_complete.db"):
+        os.remove("./test_alhasade_complete.db")
+except PermissionError:
+    pass  # File locked by another process; will be overwritten by create_all
+
 # Add src to path so we can import the pipeline modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
@@ -18,10 +25,6 @@ from app.db.session import engine
 from app.db.base import Base
 from app.models import user, query, material
 
-# Remove existing test database file to ensure clean state
-if os.path.exists("./test_alhasade_complete.db"):
-    os.remove("./test_alhasade_complete.db")
-
 # Create the tables
 Base.metadata.create_all(bind=engine)
 
@@ -31,14 +34,14 @@ def test_register_user():
     response = client.post(
         "/auth/register",
         json={
-            "email": "test_register@example.com",
+            "email": "test_register_complete@example.com",
             "password": "testpassword123",
             "full_name": "Test User"
         },
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["email"] == "test_register@example.com"
+    assert data["email"] == "test_register_complete@example.com"
     assert data["full_name"] == "Test User"
     assert "id" in data
     print("User registration test passed!")

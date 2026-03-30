@@ -9,7 +9,6 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing")
 os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_alhasade_complete.db")
 os.environ.setdefault("GEMINI_API_KEY", "test-gemini-key")
-os.environ.setdefault("NVIDIA_API_KEY", "test-nvidia-key")
 
 # Raise rate limits so the full test suite doesn't self-throttle
 os.environ["AUTH_RATE_LIMIT"] = "1000/minute"

@@ -25,8 +25,12 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
 import InboxIcon from '@mui/icons-material/Inbox';
 import { getGenerations, downloadFile } from '../api/generations';
+import { getErrorMessage } from '../api/client';
 import { StatusChip } from '../components/StatusChip';
+import { useNotification } from '../hooks/useNotification';
 import { GenerationListItem } from '../types';
+import { AxiosError } from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const PAGE_SIZE = 10;
 
@@ -49,6 +53,8 @@ const hasActiveItems = (items: GenerationListItem[]) =>
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { notifyError } = useNotification();
   const [page, setPage] = useState(1);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -73,8 +79,8 @@ export const DashboardPage: React.FC = () => {
     setDownloadingId(id);
     try {
       await downloadFile(id, 'student_pdf');
-    } catch {
-      // Silently fail — user can go to detail page for more options
+    } catch (err) {
+      notifyError(getErrorMessage(err as AxiosError));
     } finally {
       setDownloadingId(null);
     }
@@ -99,10 +105,10 @@ export const DashboardPage: React.FC = () => {
       >
         <Box>
           <Typography variant="h4" component="h1" fontWeight={700}>
-            היסטוריית יצירות / سجل الإنشاءات
+            {t('dashboard.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
-            כל חומרי הלימוד שנוצרו / جميع المواد التعليمية التي تم إنشاؤها
+            {t('dashboard.subtitle')}
           </Typography>
         </Box>
         <Button
@@ -111,15 +117,16 @@ export const DashboardPage: React.FC = () => {
           startIcon={<AddCircleIcon />}
           onClick={() => navigate('/generate')}
         >
-          יצירה חדשה / إنشاء جديد
+          {t('dashboard.newGeneration')}
         </Button>
       </Box>
 
       {/* Error state */}
       {isError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {(error as Error)?.message ??
-            'שגיאה בטעינת הנתונים / خطأ في تحميل البيانات'}
+        <Alert severity="error" sx={{ mb: 3 }} role="alert">
+          {error && 'response' in (error as object)
+            ? getErrorMessage(error as AxiosError)
+            : t('dashboard.loadError')}
         </Alert>
       )}
 
@@ -146,12 +153,12 @@ export const DashboardPage: React.FC = () => {
               gap: 2,
             }}
           >
-            <InboxIcon sx={{ fontSize: 72, color: 'text.disabled' }} />
+            <InboxIcon sx={{ fontSize: 72, color: 'text.disabled' }} aria-hidden="true" />
             <Typography variant="h6" color="text.secondary">
-              אין יצירות עדיין / لا توجد إنشاءات بعد
+              {t('dashboard.emptyTitle')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              לחץ על הכפתור למטה כדי ליצור חומרי לימוד ראשונים / انقر على الزر أدناه لإنشاء أول مواد تعليمية
+              {t('dashboard.emptySubtitle')}
             </Typography>
             <Button
               variant="contained"
@@ -159,7 +166,7 @@ export const DashboardPage: React.FC = () => {
               onClick={() => navigate('/generate')}
               sx={{ mt: 1 }}
             >
-              יצירה חדשה / إنشاء جديد
+              {t('dashboard.newGeneration')}
             </Button>
           </CardContent>
         </Card>
@@ -172,7 +179,7 @@ export const DashboardPage: React.FC = () => {
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: 'primary.main' }}>
-                  {['נושא / الموضوع', 'נושא משנה / الموضوع الفرعي', 'כיתה / الصف', 'סבבים / الجولات', 'סטטוס / الحالة', 'תאריך / التاريخ', 'פעולות / إجراءات'].map(
+                  {[t('dashboard.tableSubject'), t('dashboard.tableTopic'), t('dashboard.tableGrade'), t('dashboard.tableRounds'), t('dashboard.tableStatus'), t('dashboard.tableDate'), t('dashboard.tableActions')].map(
                     (header) => (
                       <TableCell
                         key={header}
@@ -203,22 +210,24 @@ export const DashboardPage: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="צפה בפרטים / عرض التفاصيل">
+                        <Tooltip title={t('dashboard.viewDetails')}>
                           <IconButton
                             size="small"
                             color="primary"
                             onClick={() => handleView(gen.generation_id)}
+                            aria-label={t('dashboard.viewDetails')}
                           >
                             <VisibilityIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         {gen.status === 'completed' && (
-                          <Tooltip title="הורד PDF תלמיד / تحميل PDF الطالب">
+                          <Tooltip title={t('dashboard.downloadStudentPdf')}>
                             <IconButton
                               size="small"
                               color="secondary"
                               onClick={() => handleQuickDownload(gen.generation_id)}
                               disabled={downloadingId === gen.generation_id}
+                              aria-label={t('dashboard.downloadStudentPdf')}
                             >
                               {downloadingId === gen.generation_id ? (
                                 <CircularProgress size={16} />
@@ -244,6 +253,7 @@ export const DashboardPage: React.FC = () => {
               onChange={(_, value) => setPage(value)}
               color="primary"
               shape="rounded"
+              aria-label={t('dashboard.title')}
             />
           </Box>
         </>

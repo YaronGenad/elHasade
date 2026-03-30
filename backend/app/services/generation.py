@@ -21,6 +21,9 @@ if str(_PROJECT_ROOT) not in sys.path:
 from src.pipeline import generate_all_rounds, generate_roadmap  # noqa: E402
 
 from app.core.config import settings as _settings  # noqa: E402
+from app.core.logging import get_logger  # noqa: E402
+
+log = get_logger("app.services.generation")
 
 
 class GenerationService:
@@ -66,8 +69,11 @@ class GenerationService:
         output_dir = self._get_output_directory(normalized)
 
         try:
+            log.info("pipeline_start", generation_id=generation_id, subject=normalized["subject"], topic=normalized["topic"], grade=normalized["grade"], rounds=normalized["rounds"], output_dir=str(output_dir))
             roadmap = generate_roadmap(normalized, str(output_dir))
+            log.info("pipeline_roadmap_done", generation_id=generation_id)
             results = generate_all_rounds(normalized, roadmap, str(output_dir))
+            log.info("pipeline_all_rounds_done", generation_id=generation_id)
 
             response: Dict[str, Any] = {
                 "generation_id": generation_id,
@@ -102,6 +108,7 @@ class GenerationService:
             return response
 
         except Exception as exc:
+            log.error("pipeline_failed", generation_id=generation_id, error=str(exc), exc_info=True)
             return {
                 "generation_id": generation_id,
                 "status": "failed",

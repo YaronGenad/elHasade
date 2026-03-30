@@ -19,7 +19,9 @@ import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { getErrorMessage } from '../api/client';
 import { AxiosError } from 'axios';
 
 const loginSchema = z.object({
@@ -35,6 +37,7 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export const LoginPage: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated } = useAuth();
@@ -64,14 +67,11 @@ export const LoginPage: React.FC = () => {
       await login(data.email, data.password);
       navigate(from, { replace: true });
     } catch (err) {
-      const axiosErr = err as AxiosError<{ detail?: string }>;
+      const axiosErr = err as AxiosError;
       if (axiosErr.response?.status === 401) {
-        setErrorMessage('אימייל או סיסמה שגויים / البريد الإلكتروني أو كلمة المرور غير صحيحة');
+        setErrorMessage(t('auth.invalidCredentials'));
       } else {
-        setErrorMessage(
-          axiosErr.response?.data?.detail ??
-            'שגיאה בהתחברות. אנא נסה שוב. / خطأ في تسجيل الدخول. الرجاء المحاولة مرة أخرى.'
-        );
+        setErrorMessage(getErrorMessage(axiosErr));
       }
     }
   };
@@ -91,21 +91,21 @@ export const LoginPage: React.FC = () => {
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           {/* Header */}
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <GrassIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+            <GrassIcon aria-hidden="true" sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
             <Typography variant="h4" color="primary" gutterBottom>
-              Al-Hasade
+              {t('common.appName')}
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              التعليمية | מחולל חומרי לימוד
+              {t('common.appSubtitle')}
             </Typography>
           </Box>
 
           <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
-            התחברות / تسجيل الدخول
+            {t('auth.login')}
           </Typography>
 
           {errorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" role="alert" sx={{ mb: 2 }}>
               {errorMessage}
             </Alert>
           )}
@@ -118,7 +118,7 @@ export const LoginPage: React.FC = () => {
           >
             <TextField
               {...register('email')}
-              label="אימייל / البريد الإلكتروني"
+              label={t('auth.email')}
               type="email"
               autoComplete="email"
               autoFocus
@@ -127,7 +127,7 @@ export const LoginPage: React.FC = () => {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <EmailIcon color="action" />
+                    <EmailIcon aria-hidden="true" color="action" />
                   </InputAdornment>
                 ),
               }}
@@ -135,7 +135,7 @@ export const LoginPage: React.FC = () => {
 
             <TextField
               {...register('password')}
-              label="סיסמה / كلمة المرور"
+              label={t('auth.password')}
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               error={!!errors.password}
@@ -143,7 +143,7 @@ export const LoginPage: React.FC = () => {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <LockIcon color="action" />
+                    <LockIcon aria-hidden="true" color="action" />
                   </InputAdornment>
                 ),
                 endAdornment: (
@@ -151,7 +151,7 @@ export const LoginPage: React.FC = () => {
                     <IconButton
                       onClick={() => setShowPassword((prev) => !prev)}
                       edge="end"
-                      aria-label="toggle password visibility"
+                      aria-label={t('auth.togglePasswordVisibility')}
                     >
                       {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                     </IconButton>
@@ -170,16 +170,16 @@ export const LoginPage: React.FC = () => {
               {isSubmitting ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
-                'התחבר / دخول'
+                t('auth.loginButton')
               )}
             </Button>
           </Box>
 
           <Box sx={{ mt: 3, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
-              אין לך חשבון? / ليس لديك حساب؟{' '}
+              {t('auth.noAccount')}{' '}
               <Link component={RouterLink} to="/register" color="primary" fontWeight={600}>
-                הרשמה / تسجيل
+                {t('auth.register')}
               </Link>
             </Typography>
           </Box>

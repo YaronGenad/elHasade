@@ -5,11 +5,12 @@ POST /materials/{id}/approve   — approval_count++ + times_served++
 POST /materials/{id}/reject    — times_served++, signals caller to regenerate
 GET  /materials/versions       — ?subject=X&topic=Y&grade=Z → all versions sorted by approval_count DESC
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
+from app.core.logging import get_logger
 from app.db.session import get_db
 from app.models.material import Material
 from app.models.user import User
@@ -18,9 +19,11 @@ from app.schemas.generation import (
     MaterialVersionItem,
     MaterialVersionsResponse,
 )
+from app.services.audit import record_audit
 from app.services.cache import CacheService
 
 router = APIRouter()
+log = get_logger("app.api.materials")
 
 
 def _get_material_or_404(material_id: str, db: Session) -> Material:
@@ -36,6 +39,7 @@ def _get_material_or_404(material_id: str, db: Session) -> Material:
 @router.post("/{material_id}/approve", response_model=MaterialApprovalResponse)
 def approve_material(
     material_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -60,6 +64,17 @@ def approve_material(
             material.subject, material.topic, material.grade, db
         )
 
+    log.info("material_approved", material_id=material_id, user_id=current_user.id, approval_count=material.approval_count)
+    record_audit(
+        db,
+        action="approve",
+        user_id=current_user.id,
+        resource_id=material_id,
+        resource_type="material",
+        details={"approval_count": material.approval_count},
+        ip_address=request.client.host if request.client else None,
+        request_id=getattr(request.state, "request_id", None),
+    )
     return MaterialApprovalResponse(
         status="approved",
         material_id=material.id,
@@ -70,6 +85,7 @@ def approve_material(
 @router.post("/{material_id}/reject", response_model=MaterialApprovalResponse)
 def reject_material(
     material_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -85,6 +101,16 @@ def reject_material(
     material.times_served = (material.times_served or 0) + 1
     db.commit()
 
+    log.info("material_rejected", material_id=material_id, user_id=current_user.id)
+    record_audit(
+        db,
+        action="reject",
+        user_id=current_user.id,
+        resource_id=material_id,
+        resource_type="material",
+        ip_address=request.client.host if request.client else None,
+        request_id=getattr(request.state, "request_id", None),
+    )
     return MaterialApprovalResponse(
         status="rejected",
         material_id=material.id,
@@ -154,5 +180,5 @@ def _refresh_unit_cache(subject: str, topic: str, grade: str, db: Session) -> No
         if ids:
             cache = CacheService()
             cache.set_unit_ids(subject, topic, grade, ids)
-    except Exception:
-        pass  # cache refresh is best-effort
+    except Exception as exc:
+        log.warning("unit_cache_refresh_failed", subject=subject, topic=topic, grade=grade, error=str(exc))

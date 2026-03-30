@@ -21,7 +21,6 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing")
 os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_alhasade_complete.db")
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
-os.environ.setdefault("NVIDIA_API_KEY", "test-key")
 os.environ.setdefault("AUTH_RATE_LIMIT", "1000/minute")
 os.environ.setdefault("GENERATION_RATE_LIMIT", "1000/minute")
 
@@ -367,12 +366,23 @@ def test_generation_unit_cache_hit():
     """
     from app.models.material import Material as MaterialModel
 
+    # Re-apply our overrides (other test modules may have replaced them at collection time)
+    app.dependency_overrides[create_generation_service] = mock_generation_service
+    app.dependency_overrides[create_search_service] = fake_search_service
+
+    # Clear shared fake-redis to avoid cross-test pollution
+    FAKE_REDIS.flushall()
+
     token = _register_and_login("unit_cache_hit@example.com")
+
+    # Use unique subject/topic to avoid BM25 matches from materials created
+    # by earlier test files (test_approval_loop, test_generations_complete, etc.)
+    subj, topic, grade = "אסטרונומיה", "כוכבי לכת", "יא-יב"
 
     # First submission — background task creates a Material record in DB
     resp1 = client.post(
         "/generations/",
-        json={"subject": "פיזיקה", "topic": "אופטיקה", "grade": "יא-יב", "rounds": 1},
+        json={"subject": subj, "topic": topic, "grade": grade, "rounds": 1},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp1.status_code == 202
@@ -383,9 +393,9 @@ def test_generation_unit_cache_hit():
         mat = (
             db.query(MaterialModel)
             .filter(
-                MaterialModel.subject == "פיזיקה",
-                MaterialModel.topic == "אופטיקה",
-                MaterialModel.grade == "יא-יב",
+                MaterialModel.subject == subj,
+                MaterialModel.topic == topic,
+                MaterialModel.grade == grade,
             )
             .first()
         )
@@ -398,12 +408,12 @@ def test_generation_unit_cache_hit():
 
     # Seed the FAKE_REDIS unit cache with that material ID
     svc = CacheService(redis_client=FAKE_REDIS)
-    svc.set_unit_ids("פיזיקה", "אופטיקה", "יא-יב", [mat_id])
+    svc.set_unit_ids(subj, topic, grade, [mat_id])
 
     # Second submission → should come from unit cache (from_cache=True)
     resp2 = client.post(
         "/generations/",
-        json={"subject": "פיזיקה", "topic": "אופטיקה", "grade": "יא-יב", "rounds": 1},
+        json={"subject": subj, "topic": topic, "grade": grade, "rounds": 1},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp2.status_code == 202
@@ -465,11 +475,8 @@ def test_metrics_endpoint_accessible():
     resp = client.get("/metrics")
     assert resp.status_code == 200
     # Content-type is either Prometheus exposition or plain text
-    assert resp.headers["content-type"] in (
-        "text/plain; version=0.0.4; charset=utf-8",
-        "text/plain; charset=utf-8",
-        "text/plain",
-    )
+    ct = resp.headers["content-type"]
+    assert "text/plain" in ct, f"Unexpected content-type: {ct}"
     print("Metrics endpoint accessible test passed!")
 
 

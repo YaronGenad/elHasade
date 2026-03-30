@@ -8,6 +8,10 @@ callers can proceed without blocking generation.
 import os
 from typing import List, Optional
 
+from app.core.logging import get_logger
+
+log = get_logger("app.services.embeddings")
+
 _gemini_client = None
 
 
@@ -19,9 +23,14 @@ def _get_gemini_client():
 
             api_key = os.environ.get("GEMINI_API_KEY", "")
             if not api_key:
+                log.warning("embed_gemini_key_missing")
                 return None
             _gemini_client = genai.Client(api_key=api_key)
-        except Exception:
+        except ImportError:
+            log.warning("embed_google_genai_not_installed")
+            return None
+        except Exception as exc:
+            log.error("embed_client_init_failed", exc_info=True)
             return None
     return _gemini_client
 
@@ -43,10 +52,14 @@ def embed_text(text: str) -> Optional[List[float]]:
             contents=text,
         )
         return list(result.embeddings[0].values)
-    except Exception:
+    except Exception as exc:
+        log.error("embed_text_failed", text_preview=text[:80], error=str(exc))
         return None
 
 
 def embedding_to_pg_literal(embedding: List[float]) -> str:
     """Convert a float list to the Postgres vector literal '[0.1,0.2,...]'."""
+    if not embedding:
+        log.warning("embedding_to_pg_literal_empty_input")
+        return "[]"
     return "[" + ",".join(str(v) for v in embedding) + "]"

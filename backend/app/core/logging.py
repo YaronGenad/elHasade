@@ -16,6 +16,7 @@ import structlog
 def setup_logging(debug: bool = False) -> None:
     """Configure structlog for the application. Call once at startup."""
     shared_processors = [
+        structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso"),

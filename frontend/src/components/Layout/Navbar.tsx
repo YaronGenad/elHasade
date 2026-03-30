@@ -15,11 +15,13 @@ import GrassIcon from '@mui/icons-material/Grass';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import LogoutIcon from '@mui/icons-material/Logout';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -47,14 +49,14 @@ export const Navbar: React.FC = () => {
     <AppBar position="fixed" color="primary" elevation={2}>
       <Toolbar sx={{ gap: 1 }}>
         {/* Logo / Brand */}
-        <GrassIcon sx={{ ml: 0, mr: 1 }} />
+        <GrassIcon sx={{ ml: 0, mr: 1 }} aria-hidden="true" />
         <Typography
           variant="h6"
           component="div"
           sx={{ fontWeight: 700, cursor: 'pointer', mr: 2 }}
           onClick={() => navigate('/dashboard')}
         >
-          Al-Hasade | الحصاد
+          {t('common.appName')}
         </Typography>
 
         {/* Navigation links */}
@@ -63,6 +65,7 @@ export const Navbar: React.FC = () => {
             color="inherit"
             startIcon={<DashboardIcon />}
             onClick={() => navigate('/dashboard')}
+            aria-current={location.pathname === '/dashboard' ? 'page' : undefined}
             sx={{
               fontWeight: isActive('/dashboard') ? 700 : 400,
               borderBottom: isActive('/dashboard') ? '2px solid white' : 'none',
@@ -70,12 +73,13 @@ export const Navbar: React.FC = () => {
               pb: '2px',
             }}
           >
-            לוח בקרה / لوحة التحكم
+            {t('nav.dashboard')}
           </Button>
           <Button
             color="inherit"
             startIcon={<AddCircleOutlineIcon />}
             onClick={() => navigate('/generate')}
+            aria-current={location.pathname === '/generate' ? 'page' : undefined}
             sx={{
               fontWeight: isActive('/generate') ? 700 : 400,
               borderBottom: isActive('/generate') ? '2px solid white' : 'none',
@@ -83,13 +87,23 @@ export const Navbar: React.FC = () => {
               pb: '2px',
             }}
           >
-            יצירה חדשה / إنشاء جديد
+            {t('nav.newGeneration')}
           </Button>
         </Box>
 
+        {/* Language toggle */}
+        <Button
+          size="small"
+          onClick={() => i18n.changeLanguage(i18n.language === 'he' ? 'ar' : 'he')}
+          sx={{ color: 'white', minWidth: 'auto', mx: 1 }}
+          aria-label={t('language.' + (i18n.language === 'he' ? 'ar' : 'he'))}
+        >
+          {i18n.language === 'he' ? 'العربية' : 'עברית'}
+        </Button>
+
         {/* User avatar + menu */}
         <Tooltip title={user?.email ?? ''}>
-          <IconButton onClick={handleMenuOpen} sx={{ p: 0.5 }}>
+          <IconButton onClick={handleMenuOpen} sx={{ p: 0.5 }} aria-label={t('nav.userMenu')}>
             <Avatar
               sx={{ bgcolor: 'secondary.main', width: 36, height: 36, fontSize: 16 }}
             >
@@ -119,7 +133,7 @@ export const Navbar: React.FC = () => {
           <Divider />
           <MenuItem onClick={handleLogout} sx={{ gap: 1, color: 'error.main' }}>
             <LogoutIcon fontSize="small" />
-            התנתק / تسجيل الخروج
+            {t('auth.logout')}
           </MenuItem>
         </Menu>
       </Toolbar>

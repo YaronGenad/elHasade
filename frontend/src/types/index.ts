@@ -110,7 +110,7 @@ export interface SubmitGenerationData {
   topic: string;
   grade: string;
   rounds: number;
-  force_new: boolean;
+  force_new?: boolean;
 }
 
 export type FileType =

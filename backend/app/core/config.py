@@ -16,11 +16,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, env="REFRESH_TOKEN_EXPIRE_DAYS")
 
-    # LLM Providers
-    LLM_PROVIDER: str = Field(default="gemini", env="LLM_PROVIDER")
+    # LLM Provider (Gemini only)
     GEMINI_API_KEY: str = Field(default="", env="GEMINI_API_KEY")
-    NVIDIA_API_KEY: str = Field(default="", env="NVIDIA_API_KEY")
-    NVIDIA_MODEL: str = Field(default="openai/gpt-oss-20b", env="NVIDIA_MODEL")
 
     # File Storage
     UPLOAD_DIR: str = Field(default="./uploads", env="UPLOAD_DIR")
@@ -29,7 +26,7 @@ class Settings(BaseSettings):
     MAX_FILE_AGE_HOURS: int = Field(default=24, env="MAX_FILE_AGE_HOURS")
 
     # Search
-    VECTOR_SIMILARITY_THRESHOLD: float = Field(default=0.3, env="VECTOR_SIMILARITY_THRESHOLD")
+    VECTOR_SIMILARITY_THRESHOLD: float = Field(default=0.15, env="VECTOR_SIMILARITY_THRESHOLD")
 
     # CORS – comma-separated list of allowed origins
     CORS_ORIGINS: str = Field(

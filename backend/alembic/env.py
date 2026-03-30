@@ -24,7 +24,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 from app.db.base import Base
 # Import all models to ensure they are registered with SQLAlchemy
-from app.models import user, query, material  # noqa
+from app.models import user, query, material, audit  # noqa
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

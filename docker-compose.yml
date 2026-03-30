@@ -55,8 +55,6 @@ services:
       REDIS_URL: redis://redis:6379
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
-      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       DEBUG: ${DEBUG:-false}
       OUTPUT_DIR: /app/output

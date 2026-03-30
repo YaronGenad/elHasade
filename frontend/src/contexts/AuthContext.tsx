@@ -20,6 +20,13 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// SECURITY NOTE — JWT Storage Risk Assessment (Sprint 7)
+// Current: localStorage. Vulnerable to XSS but not CSRF.
+// Alternative: httpOnly cookies — immune to XSS but requires CSRF protection,
+// backend Set-Cookie changes, and SameSite/Secure config.
+// Mitigation: strict CSP in nginx.conf blocks inline scripts; Zod sanitization
+// strips HTML from user inputs. Migration to httpOnly cookies is recommended
+// for a future sprint if the threat model changes (e.g., third-party scripts).
 const saveTokens = (tokens: Token) => {
   localStorage.setItem('access_token', tokens.access_token);
   localStorage.setItem('refresh_token', tokens.refresh_token);

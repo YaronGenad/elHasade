@@ -121,11 +121,12 @@ alHasade/
 ├── backend/
 │   ├── app/
 │   │   ├── api/          — endpoints: auth, generations, search, materials
-│   │   ├── core/         — config, logging, security
+│   │   ├── core/         — config, logging, security, exceptions
 │   │   ├── db/           — session, base
-│   │   ├── models/       — SQLAlchemy: User, Generation, Material
+│   │   ├── middleware/   — auth, request_id, request logging
+│   │   ├── models/       — SQLAlchemy: User, Query, Material, Audit
 │   │   ├── schemas/      — Pydantic schemas
-│   │   ├── services/     — cache.py, search.py, embeddings.py, cleanup.py
+│   │   ├── services/     — cache, search, embeddings, generation, audit, cleanup
 │   │   └── main.py       — FastAPI app, /health, /metrics
 │   ├── alembic/          — migrations (כולל pgvector extension + tsvector trigger)
 │   ├── test_*.py         — 5 קבצי בדיקות
@@ -133,6 +134,8 @@ alHasade/
 ├── frontend/
 │   └── src/
 │       ├── pages/        — Login, Register, Dashboard, NewGeneration, GenerationDetail
+│       ├── components/   — ErrorBoundary
+│       ├── hooks/        — useNotification
 │       ├── api/          — API clients (auth, generations, search, materials)
 │       ├── contexts/     — AuthContext
 │       └── types/        — TypeScript types
@@ -143,6 +146,8 @@ alHasade/
 ├── docker-compose.monitoring.yml — Prometheus + Grafana + redis-exporter
 ├── nginx.conf            — SSL termination, rate limiting, reverse proxy
 ├── prometheus.yml        — scrape config
+├── prometheus_rules.yml  — alert rules (error rate, latency, service down)
+├── alertmanager.yml      — alert routing (webhook/email)
 ├── locustfile.py         — load test: 50 מורים במקביל
 └── DEPLOYMENT.md         — runbook מלא לפרודקשן (AWS LightSail + Aurora)
 ```
@@ -176,6 +181,23 @@ POST /generations/  (subject + topic + grade)
 לפריסה על AWS LightSail + Aurora Serverless v2 — ראה [DEPLOYMENT.md](DEPLOYMENT.md).
 
 CI/CD אוטומטי דרך GitHub Actions: push ל-`main` → בדיקות → build GHCR → SSH deploy.
+
+---
+
+## Monitoring
+
+```bash
+# הפעלת סטאק monitoring (מעל docker-compose.prod.yml)
+docker compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml --env-file .env.prod up -d
+```
+
+| שירות | כתובת | תפקיד |
+|-------|-------|-------|
+| Prometheus | http://server:9090 | metrics scraping (backend + Redis) |
+| Grafana | http://server:3001 | dashboards |
+| AlertManager | http://server:9093 | alert routing (webhook/email) |
+
+מדדים מרכזיים: `http_requests_total`, `http_request_duration_seconds`, Redis memory/eviction.
 
 ---
 
