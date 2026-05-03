@@ -48,6 +48,10 @@ generated_materials/
 # Development planning documents (internal, not part of the codebase)
 plans/
 
+# Markdown docs — only README.md is tracked; everything else is dev process
+*.md
+!README.md
+
 # Certbot / SSL (populated on first deploy)
 certbot/
 

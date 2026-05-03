@@ -22,3 +22,12 @@ class PDFRenderError(Exception):
         self.message: str = message
         self.detail: str = detail
         super().__init__(message)
+
+
+class CostLimitExceededError(Exception):
+    """Raised when a generation would exceed the per-request cost cap."""
+
+    def __init__(self, message: str = "Cost limit exceeded", detail: str = "") -> None:
+        self.message: str = message
+        self.detail: str = detail
+        super().__init__(message)

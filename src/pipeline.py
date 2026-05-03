@@ -4,8 +4,12 @@ from typing import Any, Dict, List
 import structlog
 
 from .gemini import call_gemini
-from .exceptions import LLMAPIError, PDFRenderError
-from .config import is_stem, is_english, SAFE_NAME_MAX_LENGTH, DEFAULT_ROUNDS
+from .exceptions import LLMAPIError, PDFRenderError, CostLimitExceededError
+from .config import (
+    is_stem, is_english, SAFE_NAME_MAX_LENGTH, DEFAULT_ROUNDS,
+    GEMINI_FLASH_INPUT_COST_PER_1M, GEMINI_FLASH_OUTPUT_COST_PER_1M,
+    GEMINI_MAX_COST_PER_GENERATION_USD,
+)
 
 _PROVIDER_LABEL = "Gemini"
 log = structlog.get_logger(__name__)
@@ -67,7 +71,8 @@ def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> 
     else:
         roadmap_prompt_fn = build_roadmap_prompt
     try:
-        roadmap = call_gemini(roadmap_prompt_fn(subject, topic, grade, rounds))
+        roadmap, roadmap_usage = call_gemini(roadmap_prompt_fn(subject, topic, grade, rounds))
+        log.info("roadmap_llm_done", input_tokens=roadmap_usage["input_tokens"], output_tokens=roadmap_usage["output_tokens"])
     except Exception as exc:
         log.error("roadmap_llm_failed", topic=topic, error=str(exc))
         raise LLMAPIError(
@@ -104,6 +109,7 @@ def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> 
         'grade': grade,
         'safe_name': safe_name,
         'output_dir': output_dir,
+        'usage': roadmap_usage,
     }
     return roadmap
 
@@ -149,17 +155,54 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
 
     files = {}
     content = {}
+    round_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
 
-    def _call_llm(prompt, station_name: str):
-        """Wrap call_gemini with LLMAPIError context."""
+    # Accumulated cost so far across this generation (passed in from caller)
+    accumulated_cost_usd: float = user_input.get('_accumulated_cost_usd', 0.0)
+
+    def _call_llm(prompt, station_name: str) -> Dict[str, Any]:
+        """Wrap call_gemini: accumulate usage, enforce cost cap, raise on LLM errors."""
+        nonlocal accumulated_cost_usd
         try:
-            return call_gemini(prompt)
+            result, usage = call_gemini(prompt)
         except Exception as exc:
             log.error("llm_call_failed", station=station_name, round=round_num, topic=topic, error=str(exc))
             raise LLMAPIError(
                 message=f"LLM call failed at station '{station_name}' (round {round_num})",
                 detail=str(exc),
             ) from exc
+
+        round_usage["input_tokens"] += usage["input_tokens"]
+        round_usage["output_tokens"] += usage["output_tokens"]
+        round_usage["cached_tokens"] += usage["cached_tokens"]
+
+        call_cost = (
+            usage["input_tokens"] * GEMINI_FLASH_INPUT_COST_PER_1M / 1_000_000
+            + usage["output_tokens"] * GEMINI_FLASH_OUTPUT_COST_PER_1M / 1_000_000
+        )
+        accumulated_cost_usd += call_cost
+
+        if accumulated_cost_usd > GEMINI_MAX_COST_PER_GENERATION_USD:
+            log.error(
+                "cost_limit_exceeded",
+                accumulated_cost_usd=round(accumulated_cost_usd, 4),
+                limit=GEMINI_MAX_COST_PER_GENERATION_USD,
+                station=station_name,
+                round=round_num,
+            )
+            raise CostLimitExceededError(
+                message=f"Generation cost ${accumulated_cost_usd:.4f} exceeded limit ${GEMINI_MAX_COST_PER_GENERATION_USD}",
+                detail=f"Stopped at station '{station_name}', round {round_num}",
+            )
+
+        log.debug(
+            "llm_call_cost",
+            station=station_name,
+            round=round_num,
+            call_cost_usd=round(call_cost, 5),
+            accumulated_usd=round(accumulated_cost_usd, 4),
+        )
+        return result
 
     def _save(html: str, path: str, station_name: str):
         """Wrap save_html with PDFRenderError context."""
@@ -298,9 +341,22 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
         log.warning("teacher_pdf_failed", round=round_num, path=teacher_pdf)
     files['teacher_pdf'] = teacher_pdf
 
-    log.info("round_complete", round=round_num, output_dir=output_dir)
+    log.info(
+        "round_complete",
+        round=round_num,
+        output_dir=output_dir,
+        input_tokens=round_usage["input_tokens"],
+        output_tokens=round_usage["output_tokens"],
+        accumulated_cost_usd=round(accumulated_cost_usd, 4),
+    )
 
-    return {'files': files, 'content': content, 'prev_texts': prev_texts}
+    return {
+        'files': files,
+        'content': content,
+        'prev_texts': prev_texts,
+        'usage': round_usage,
+        '_accumulated_cost_usd': accumulated_cost_usd,
+    }
 
 
 def generate_all_rounds(user_input: Dict[str, Any], roadmap: Dict[str, Any], output_dir: str = "output") -> Dict[str, Any]:
@@ -309,17 +365,39 @@ def generate_all_rounds(user_input: Dict[str, Any], roadmap: Dict[str, Any], out
     prev_texts = []
     all_student_files = []
     all_teacher_files = []
+    total_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
+
+    # Carry roadmap usage forward
+    roadmap_usage = roadmap.get('_meta', {}).get('usage', {})
+    for k in total_usage:
+        total_usage[k] += roadmap_usage.get(k, 0)
+
+    accumulated_cost_usd: float = (
+        roadmap_usage.get("input_tokens", 0) * GEMINI_FLASH_INPUT_COST_PER_1M / 1_000_000
+        + roadmap_usage.get("output_tokens", 0) * GEMINI_FLASH_OUTPUT_COST_PER_1M / 1_000_000
+    )
+
+    # Pass running cost into each round via user_input copy
+    round_input = dict(user_input)
 
     failed_rounds = []
     for i in range(1, total + 1):
+        round_input['_accumulated_cost_usd'] = accumulated_cost_usd
         try:
-            result = generate_round(user_input, roadmap, i, output_dir, prev_texts)
-        except (LLMAPIError, PDFRenderError) as exc:
+            result = generate_round(round_input, roadmap, i, output_dir, prev_texts)
+        except (LLMAPIError, PDFRenderError, CostLimitExceededError) as exc:
             log.error("round_failed", round=i, total=total, error=str(exc))
             failed_rounds.append(i)
             all_results.append({"error": str(exc), "round": i})
+            if isinstance(exc, CostLimitExceededError):
+                # Abort remaining rounds immediately
+                break
             continue
         prev_texts = result.get('prev_texts', prev_texts)
+        accumulated_cost_usd = result.get('_accumulated_cost_usd', accumulated_cost_usd)
+        round_usage = result.get('usage', {})
+        for k in total_usage:
+            total_usage[k] += round_usage.get(k, 0)
         all_results.append(result)
         files = result.get('files', {})
         all_student_files.extend([
@@ -350,10 +428,23 @@ def generate_all_rounds(user_input: Dict[str, Any], roadmap: Dict[str, Any], out
     if not make_pdf([f for f in all_teacher_files if f], unit_teacher_pdf, topic, f"יחידה מלאה — {total} סבבים — למורה"):
         log.warning("full_teacher_pdf_failed", path=unit_teacher_pdf)
 
-    log.info("all_rounds_complete", total=total, output_dir=output_dir)
+    total_cost_usd = (
+        total_usage["input_tokens"] * GEMINI_FLASH_INPUT_COST_PER_1M / 1_000_000
+        + total_usage["output_tokens"] * GEMINI_FLASH_OUTPUT_COST_PER_1M / 1_000_000
+    )
+    log.info(
+        "all_rounds_complete",
+        total=total,
+        output_dir=output_dir,
+        total_input_tokens=total_usage["input_tokens"],
+        total_output_tokens=total_usage["output_tokens"],
+        total_cost_usd=round(total_cost_usd, 4),
+    )
 
     return {
         'rounds': all_results,
         'student_pdf': unit_student_pdf,
         'teacher_pdf': unit_teacher_pdf,
+        'usage': total_usage,
+        'cost_usd': round(total_cost_usd, 6),
     }

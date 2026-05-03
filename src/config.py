@@ -6,6 +6,15 @@ GEMINI_MODEL: str = "models/gemini-flash-latest"
 GEMINI_MAX_RETRIES: int = 3
 GEMINI_RATE_LIMIT_BACKOFF_BASE: int = 20  # seconds, multiplied by (attempt + 1)
 
+# ─── Token & Cost Configuration ─────────────────────────────────────────────
+GEMINI_MAX_OUTPUT_TOKENS: int = 4096          # per LLM call; prevents runaway output
+# Gemini Flash 2.0 pricing (USD per 1M tokens)
+GEMINI_FLASH_INPUT_COST_PER_1M: float = 0.10
+GEMINI_FLASH_OUTPUT_COST_PER_1M: float = 0.40
+# Hard safety cap per generation. Set conservatively; tighten after collecting
+# real data from the 6 test scenarios.
+GEMINI_MAX_COST_PER_GENERATION_USD: float = 0.05  # 3x observed max ($0.017); tighten further once stable
+
 # ─── Pipeline Configuration ─────────────────────────────────────────────────────
 SAFE_NAME_MAX_LENGTH: int = 50
 DEFAULT_ROUNDS: int = 4

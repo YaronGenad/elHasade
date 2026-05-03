@@ -83,6 +83,9 @@ class GenerationService:
                 "roadmap": roadmap,
                 "results": results,
                 "generated_at": datetime.utcnow().isoformat() + "Z",
+                # Bubble up token usage and cost so caller can persist them
+                "usage": results.get("usage", {}),
+                "cost_usd": results.get("cost_usd"),
             }
 
             if results:

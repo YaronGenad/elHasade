@@ -6,9 +6,11 @@ def build_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> s
     gl = get_grade_level(grade)
     return f"""אתה מתכנן יחידת לימוד בשיטת א"ל השד"ה (הבנה, שיטות, דיוק, הרחבת אוצר מילים).
 
-**נושא:** {subject} — {topic}
-**כיתה:** {grade} | **גיל:** {gl['age']} | **רמת שפה:** {gl['language']}
-**מספר סבבים:** {rounds}
+<user_input>
+נושא: {subject} — {topic}
+כיתה: {grade} | גיל: {gl['age']} | רמת שפה: {gl['language']}
+מספר סבבים: {rounds}
+</user_input>
 
 **חוקי ברזל:**
 1. כל 4 תחנות בכל סבב — **עצמאיות לחלוטין** (תלמיד יכול להתחיל בכל אחת)
@@ -82,13 +84,14 @@ def build_comprehension_prompt(subject: str, topic: str, grade: str,
     text_desc = round_plan.get('comprehension', {}).get('description', '')
     disc_focus = round_plan.get('comprehension', {}).get('discussion_focus', 'קונפליקט ודילמה')
 
-    return f"""כתוב טקסט {text_type} עשיר לתחנת ההבנה בשיטת א"ל השד"ה.
+    return f"""כתוב טקסט לתחנת ההבנה בשיטת א"ל השד"ה.
 
-**נושא:** {subject} — {topic}
-**כיתה:** {grade} | **גיל:** {gl['age']} | **שפה:** {gl['language']}
-**סבב {round_num} מתוך {total_rounds}** | **תכנון:** {text_desc}
-**מוקד הדיון:** {disc_focus}
-{prev}
+<user_input>
+נושא: {subject} — {topic}
+כיתה: {grade} | גיל: {gl['age']} | שפה: {gl['language']}
+סבב {round_num} מתוך {total_rounds} | סוג טקסט: {text_type} | תכנון: {text_desc}
+מוקד הדיון: {disc_focus}{prev}
+</user_input>
 
 **אפשרויות פעילות לתחנת הבנה לגיל זה:** {', '.join(gl['comprehension_options'])}
 
@@ -143,11 +146,13 @@ def build_methods_prompt(subject: str, topic: str, grade: str,
 
     return f"""צור משימת כתיבה מובנית לתחנת השיטות — א"ל השד"ה.
 
-**נושא:** {subject} — {topic} | **סבב {round_num}**
-**כיתה:** {grade} | **גיל:** {gl['age']}
-**סוג הכתיבה:** {writing_type} | **תכנון:** {methods_desc}
-**מונחים מהטקסט:** {', '.join(key_terms[:8])}
-**הקשר הטקסט:** {text_summary[:300]}
+<user_input>
+נושא: {subject} — {topic} | סבב {round_num}
+כיתה: {grade} | גיל: {gl['age']}
+סוג הכתיבה: {writing_type} | תכנון: {methods_desc}
+מונחים מהטקסט: {', '.join(key_terms[:8])}
+הקשר הטקסט: {text_summary[:300]}
+</user_input>
 
 **סוגי כתיבה אפשריים ודרישותיהם:**
 - טיעון: עמדה + 3 נימוקים + סיכום, כיתה ד ומעלה
@@ -201,11 +206,13 @@ def build_precision_prompt(subject: str, topic: str, grade: str,
 
     return f"""צור פעילות לתחנת הדיוק (לשון ודקדוק) — א"ל השד"ה.
 
-**נושא:** {subject} — {topic} | **סבב {round_num}**
-**כיתה:** {grade} | **גיל:** {gl['age']}
-**סוג הפעילות:** {activity_type} | **תכנון:** {precision_desc}
-**מילים מהטקסט:** {', '.join(key_terms[:12])}
-**מספר מילים להכתבה לגיל זה:** {gl['dictation_words']}
+<user_input>
+נושא: {subject} — {topic} | סבב {round_num}
+כיתה: {grade} | גיל: {gl['age']}
+סוג הפעילות: {activity_type} | תכנון: {precision_desc}
+מילים מהטקסט: {', '.join(key_terms[:12])}
+מספר מילים להכתבה לגיל זה: {gl['dictation_words']}
+</user_input>
 
 **ארגז הכלים הלשוני המלא — בחר מגוון:**
 - הכתבה: מילים ומשפטים מהטקסט
@@ -275,11 +282,13 @@ def build_vocabulary_prompt(subject: str, topic: str, grade: str,
 
     return f"""צור פעילות לתחנת הרחבת אוצר מילים — א"ל השד"ה.
 
-**נושא:** {subject} — {topic} | **סבב {round_num}**
-**כיתה:** {grade} | **גיל:** {gl['age']}
-**סוג הפעילות:** {activity_type} | **תכנון:** {vocab_desc}
-**מונחים מהטקסט:** {', '.join(key_terms[:12])}
-**סוגים שכבר השתמשנו בהם:** {', '.join(used_types) if used_types else 'אין'}
+<user_input>
+נושא: {subject} — {topic} | סבב {round_num}
+כיתה: {grade} | גיל: {gl['age']}
+סוג הפעילות: {activity_type} | תכנון: {vocab_desc}
+מונחים מהטקסט: {', '.join(key_terms[:12])}
+סוגים שכבר השתמשנו בהם: {', '.join(used_types) if used_types else 'אין'}
+</user_input>
 {physical_note}
 
 **עקרון התחנה:** "מה שנצרב בעור נשמר לנצח" — זיכרון ויזואלי + שמיעתי + תחושתי-מוטורי
@@ -353,7 +362,9 @@ def build_teacher_prep_prompt(subject: str, topic: str, grade: str,
 
     return f"""צור דף הכנה למורה לסבב {round_num} של יחידה בשיטת א"ל השד"ה.
 
-**נושא:** {subject} — {topic} | **כיתה:** {grade} | **סבב {round_num}**
+<user_input>
+נושא: {subject} — {topic} | כיתה: {grade} | סבב {round_num}
+</user_input>
 
 **תחנות הסבב:**
 - הבנה: {comp.get('section_title', '')} ({len(comp.get('paragraphs', []))} פסקאות) — **תחנה בעל פה בלבד**, המורה לא נמצאת כאן

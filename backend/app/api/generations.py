@@ -63,6 +63,31 @@ def process_generation_task(
         db_query.result = json.dumps(result) if result.get("status") == "completed" else None
         db_query.error_message = result.get("error") if result.get("status") == "failed" else None
 
+        # ── Token / cost tracking ────────────────────────────────────────────
+        usage = result.get("usage", {})
+        input_tokens = usage.get("input_tokens", 0) or 0
+        output_tokens = usage.get("output_tokens", 0) or 0
+        cost_usd = result.get("cost_usd") or 0.0
+        if input_tokens or output_tokens or cost_usd:
+            db_query.input_tokens = input_tokens
+            db_query.output_tokens = output_tokens
+            db_query.cost_usd = cost_usd
+            log.info(
+                "generation_token_usage",
+                query_id=query_id,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_usd=cost_usd,
+            )
+            try:
+                from app.main import GEMINI_INPUT_TOKENS, GEMINI_OUTPUT_TOKENS, GEMINI_COST_USD, _PROMETHEUS_AVAILABLE
+                if _PROMETHEUS_AVAILABLE:
+                    GEMINI_INPUT_TOKENS.labels(generation_id=query_id).inc(input_tokens)
+                    GEMINI_OUTPUT_TOKENS.labels(generation_id=query_id).inc(output_tokens)
+                    GEMINI_COST_USD.labels(generation_id=query_id).inc(cost_usd)
+            except Exception:
+                pass  # Prometheus is optional
+
         if result.get("status") == "completed":
             log.info("generation_task_completed", query_id=query_id)
             db_query.completed_at = datetime.utcnow()
@@ -465,6 +490,9 @@ def get_generation(
         result=json.loads(query.result) if query.result else None,
         error=query.error_message,
         material_id=material.id if material else None,
+        input_tokens=query.input_tokens,
+        output_tokens=query.output_tokens,
+        cost_usd=query.cost_usd,
     )
 
 

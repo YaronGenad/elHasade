@@ -40,6 +40,21 @@ try:
         "HTTP request latency",
         ["endpoint"],
     )
+    GEMINI_INPUT_TOKENS = Counter(
+        "gemini_input_tokens_total",
+        "Total Gemini input tokens consumed",
+        ["generation_id"],
+    )
+    GEMINI_OUTPUT_TOKENS = Counter(
+        "gemini_output_tokens_total",
+        "Total Gemini output tokens consumed",
+        ["generation_id"],
+    )
+    GEMINI_COST_USD = Counter(
+        "gemini_cost_usd_total",
+        "Total Gemini cost in USD",
+        ["generation_id"],
+    )
     _PROMETHEUS_AVAILABLE = True
 except ImportError:
     _PROMETHEUS_AVAILABLE = False
@@ -65,7 +80,8 @@ async def _rate_limit_exceeded_handler_with_logging(request: Request, exc: RateL
         client_ip=request.client.host if request.client else "unknown",
         detail=str(exc.detail),
     )
-    return await _rate_limit_exceeded_handler(request, exc)
+    # _rate_limit_exceeded_handler returns a Response directly (not a coroutine)
+    return _rate_limit_exceeded_handler(request, exc)
 
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler_with_logging)

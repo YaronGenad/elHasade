@@ -6,11 +6,13 @@ def build_english_roadmap_prompt(subject: str, topic: str, grade: str, rounds: i
     egl = get_english_grade_level(grade)
     return f"""You are planning an English language learning unit using the Al-HaSadeh (station-rotation) method.
 
-**Subject:** {subject} | **Topic:** {topic}
-**Grade:** {grade} | **Age:** {egl['age']} | **CEFR Level:** {egl['cefr']}
-**Number of rounds:** {rounds}
-
 **IMPORTANT: ALL output — every word, title, instruction, question, and label — must be in English.**
+
+<user_input>
+Subject: {subject} | Topic: {topic}
+Grade: {grade} | Age: {egl['age']} | CEFR Level: {egl['cefr']}
+Number of rounds: {rounds}
+</user_input>
 
 **Station structure (same as Hebrew edition, but fully in English):**
 1. **Comprehension Station** — rich reading text + oral discussion only (no writing)
@@ -88,15 +90,16 @@ def build_english_comprehension_prompt(subject: str, topic: str, grade: str,
     text_desc = round_plan.get('comprehension', {}).get('description', '')
     disc_focus = round_plan.get('comprehension', {}).get('discussion_focus', 'conflict and values')
 
-    return f"""Write a rich {text_type} text for the Comprehension Station of an Al-HaSadeh English lesson.
+    return f"""Write a rich text for the Comprehension Station of an Al-HaSadeh English lesson.
 
 **IMPORTANT: ALL output — every word, title, instruction, question, and label — must be in English.**
 
-**Subject:** {subject} | **Topic:** {topic}
-**Grade:** {grade} | **Age:** {egl['age']} | **CEFR:** {egl['cefr']} | **Language level:** {egl['language']}
-**Round {round_num} of {total_rounds}** | **Plan:** {text_desc}
-**Discussion focus:** {disc_focus}
-{prev}
+<user_input>
+Subject: {subject} | Topic: {topic}
+Grade: {grade} | Age: {egl['age']} | CEFR: {egl['cefr']} | Language level: {egl['language']}
+Round {round_num} of {total_rounds} | Text type: {text_type} | Plan: {text_desc}
+Discussion focus: {disc_focus}{prev}
+</user_input>
 
 **Age-appropriate comprehension activities:** {', '.join(egl['comprehension_options'])}
 
@@ -154,11 +157,13 @@ def build_english_methods_prompt(subject: str, topic: str, grade: str,
 
 **IMPORTANT: ALL output — every word, title, instruction, question, and label — must be in English.**
 
-**Subject:** {subject} | **Topic:** {topic} | **Round {round_num}**
-**Grade:** {grade} | **Age:** {egl['age']} | **CEFR:** {egl['cefr']}
-**Writing type:** {writing_type} | **Plan:** {methods_desc}
-**Key words from text:** {', '.join(key_terms[:8])}
-**Text context:** {text_summary[:300]}
+<user_input>
+Subject: {subject} | Topic: {topic} | Round {round_num}
+Grade: {grade} | Age: {egl['age']} | CEFR: {egl['cefr']}
+Writing type: {writing_type} | Plan: {methods_desc}
+Key words from text: {', '.join(key_terms[:8])}
+Text context: {text_summary[:300]}
+</user_input>
 
 **Writing types and their requirements:**
 - Opinion paragraph: clear stance + 2-3 reasons + conclusion
@@ -212,11 +217,13 @@ def build_english_precision_prompt(subject: str, topic: str, grade: str,
 
 **IMPORTANT: ALL output — every word, title, instruction, question, and label — must be in English.**
 
-**Subject:** {subject} | **Topic:** {topic} | **Round {round_num}**
-**Grade:** {grade} | **Age:** {egl['age']} | **CEFR:** {egl['cefr']}
-**Activity type:** {activity_type} | **Plan:** {precision_desc}
-**Words from the text:** {', '.join(key_terms[:12])}
-**Number of spelling words for this grade:** {egl['dictation_words']}
+<user_input>
+Subject: {subject} | Topic: {topic} | Round {round_num}
+Grade: {grade} | Age: {egl['age']} | CEFR: {egl['cefr']}
+Activity type: {activity_type} | Plan: {precision_desc}
+Words from the text: {', '.join(key_terms[:12])}
+Number of spelling words for this grade: {egl['dictation_words']}
+</user_input>
 
 **Full language toolkit — choose a variety:**
 - Spelling: words and sentences from the text
@@ -285,11 +292,13 @@ The activity must involve body, hands, movement — "what is felt is remembered"
 
 **IMPORTANT: ALL output — every word, title, instruction, question, and label — must be in English.**
 
-**Subject:** {subject} | **Topic:** {topic} | **Round {round_num}**
-**Grade:** {grade} | **Age:** {egl['age']} | **CEFR:** {egl['cefr']}
-**Activity type:** {activity_type} | **Plan:** {vocab_desc}
-**Key words from text:** {', '.join(key_terms[:12])}
-**Types already used:** {', '.join(used_types) if used_types else 'none'}
+<user_input>
+Subject: {subject} | Topic: {topic} | Round {round_num}
+Grade: {grade} | Age: {egl['age']} | CEFR: {egl['cefr']}
+Activity type: {activity_type} | Plan: {vocab_desc}
+Key words from text: {', '.join(key_terms[:12])}
+Types already used: {', '.join(used_types) if used_types else 'none'}
+</user_input>
 {physical_note}
 
 **Station principle:** "What is felt is remembered" — visual + auditory + kinaesthetic memory
@@ -368,7 +377,9 @@ def build_english_teacher_prep_prompt(subject: str, topic: str, grade: str,
 
 **IMPORTANT: ALL output — every word, title, instruction, question, and label — must be in English.**
 
-**Subject:** {subject} | **Topic:** {topic} | **Grade:** {grade} | **CEFR:** {egl['cefr']} | **Round {round_num}**
+<user_input>
+Subject: {subject} | Topic: {topic} | Grade: {grade} | CEFR: {egl['cefr']} | Round {round_num}
+</user_input>
 
 **Round stations:**
 - Comprehension: {comp.get('section_title', '')} ({len(comp.get('paragraphs', []))} paragraphs) — **oral station only, teacher NOT required here**

@@ -73,3 +73,12 @@ class SearchError(AppError):
 
     def __init__(self, message: str = "Search failed", detail: str = ""):
         super().__init__(message, error_code="SEARCH_ERROR", detail=detail)
+
+
+class CostLimitExceededError(AppError):
+    """Raised when a generation would exceed the per-request cost cap."""
+
+    http_status_code = 402
+
+    def __init__(self, message: str = "Cost limit exceeded", detail: str = ""):
+        super().__init__(message, error_code="COST_LIMIT_EXCEEDED", detail=detail)

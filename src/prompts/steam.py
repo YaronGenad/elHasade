@@ -5,10 +5,12 @@ from ..config import get_grade_level, get_stem_grade_level, STEAM_GAMES_LIST
 def build_stem_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> str:
     gl = get_grade_level(grade)
     sgl = get_stem_grade_level(grade)
-    return f"""אתה מתכנן יחידת לימוד בשיטת א"ל השד"ה — **גרסת STEAM** (מתמטיקה/מדעים/הנדסה/טכנולוגיה/אמנויות).
+    return f"""אתה מתכנן יחידת לימוד בשיטת א"ל השד"ה — גרסת STEAM (מתמטיקה/מדעים/הנדסה/טכנולוגיה/אמנויות).
 
-**מקצוע:** {subject} | **נושא:** {topic}
-**כיתה:** {grade} | **גיל:** {gl['age']} | **מספר סבבים:** {rounds}
+<user_input>
+מקצוע: {subject} | נושא: {topic}
+כיתה: {grade} | גיל: {gl['age']} | מספר סבבים: {rounds}
+</user_input>
 
 **שינויים עיקריים בגרסת STEAM לעומת גרסת השפה:**
 - תחנת הבנה: ערוצי קלט מגוונים (טקסט/סרטון/תצפית/ניסוי) + תיעוד כתוב קצר מותר
@@ -102,12 +104,13 @@ def build_stem_comprehension_prompt(subject: str, topic: str, grade: str,
 
     return f"""כתוב חומר לתחנת ההבנה — א"ל השד"ה גרסת STEAM.
 
-**מקצוע:** {subject} | **נושא:** {topic}
-**כיתה:** {grade} | **גיל:** {gl['age']}
-**סבב {round_num} מתוך {total_rounds}** | **שלב:** {stage}
-**ערוץ קלט:** {input_label} | **תכנון:** {desc}
-**מוקד חקירה:** {disc_focus}
-{prev}
+<user_input>
+מקצוע: {subject} | נושא: {topic}
+כיתה: {grade} | גיל: {gl['age']}
+סבב {round_num} מתוך {total_rounds} | שלב: {stage}
+ערוץ קלט: {input_label} | תכנון: {desc}
+מוקד חקירה: {disc_focus}{prev}
+</user_input>
 
 **⚠️ הבדלים מגרסת השפה:**
 - מותר לכלול תשובה כתובה קצרה (1-3 משפטים) לצורך תיעוד הבנה
@@ -184,13 +187,14 @@ def build_stem_methods_prompt(subject: str, topic: str, grade: str,
 
     return f"""צור משימת חשיבה תהליכית-פרוצדורלית לתחנת השיטות — א"ל השד"ה גרסת STEAM.
 
-**מקצוע:** {subject} | **נושא:** {topic} | **סבב {round_num}**
-**כיתה:** {grade} | **גיל:** {gl['age']}
-**מסגרת חשיבה:** {fw_desc}
-**תכנון:** {methods_desc}
-**מונחים מהחומר:** {', '.join(key_terms[:8])}
-**הקשר:** {text_summary[:300]}
-{data_note}
+<user_input>
+מקצוע: {subject} | נושא: {topic} | סבב {round_num}
+כיתה: {grade} | גיל: {gl['age']}
+מסגרת חשיבה: {fw_desc}
+תכנון: {methods_desc}
+מונחים מהחומר: {', '.join(key_terms[:8])}
+הקשר: {text_summary[:300]}
+</user_input>{data_note}
 
 **מסגרות חשיבה זמינות לגיל זה:** {', '.join(sgl['methods_frameworks'])}
 
@@ -244,11 +248,13 @@ def build_stem_precision_prompt(subject: str, topic: str, grade: str,
 
     return f"""צור פעילות HANDS-ON לתחנת הדיוק — א"ל השד"ה גרסת STEAM.
 
-**מקצוע:** {subject} | **נושא:** {topic} | **סבב {round_num}**
-**כיתה:** {grade} | **גיל:** {gl['age']}
-**סוג הפעילות:** {type_desc}
-**תכנון:** {precision_desc}
-**מונחי מפתח:** {', '.join(key_terms[:10])}
+<user_input>
+מקצוע: {subject} | נושא: {topic} | סבב {round_num}
+כיתה: {grade} | גיל: {gl['age']}
+סוג הפעילות: {type_desc}
+תכנון: {precision_desc}
+מונחי מפתח: {', '.join(key_terms[:10])}
+</user_input>
 
 **פעילויות HANDS-ON מתאימות לגיל זה:** {', '.join(sgl['precision_activities'])}
 
@@ -325,12 +331,14 @@ def build_stem_vocabulary_prompt(subject: str, topic: str, grade: str,
 
     return f"""צור פעילות לתחנת הרחבת אוצר מילים — א"ל השד"ה גרסת STEAM.
 
-**מקצוע:** {subject} | **נושא:** {topic} | **סבב {round_num}**
-**כיתה:** {grade} | **גיל:** {gl['age']}
-**המשחק:** {game_name} | **מנגנון:** {game_mechanic}
-**תכנון:** {vocab_desc}
-**מונחים מהחומר:** {', '.join(key_terms[:12])}
-**סוגים שבוצעו כבר:** {', '.join(used_types) if used_types else 'אין'}
+<user_input>
+מקצוע: {subject} | נושא: {topic} | סבב {round_num}
+כיתה: {grade} | גיל: {gl['age']}
+המשחק: {game_name} | מנגנון: {game_mechanic}
+תכנון: {vocab_desc}
+מונחים מהחומר: {', '.join(key_terms[:12])}
+סוגים שבוצעו כבר: {', '.join(used_types) if used_types else 'אין'}
+</user_input>
 
 **עקרון STEAM לתחנה זו:**
 - כל מונח: עברית + אנגלית + הגדרה + קטגוריית STEAM (מדעים/מתמטיקה/הנדסה/טכנולוגיה/אמנויות)

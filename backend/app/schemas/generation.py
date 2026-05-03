@@ -1,7 +1,21 @@
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Characters that are meaningful in LLM prompt context and must not come from user input:
+#   \n \r \t  — allow injecting new instruction paragraphs
+#   **  ##     — mimic system-prompt markdown formatting
+#   ` (backtick) — code blocks / template delimiters
+#   < >        — XML/HTML tag injection (used for structural separation markers)
+_INJECTION_RE = re.compile(r'[\n\r\t]|\*\*|##|`|<[^>]*>|<|>')
+
+
+def _sanitize(value: str) -> str:
+    """Strip prompt-injection characters and normalize whitespace."""
+    value = _INJECTION_RE.sub(' ', value)
+    return re.sub(r' {2,}', ' ', value).strip()
 
 
 class GenerationRequest(BaseModel):
@@ -13,6 +27,11 @@ class GenerationRequest(BaseModel):
         default=False,
         description="Skip cache/similarity checks and always generate fresh materials",
     )
+
+    @field_validator('subject', 'topic', 'grade', mode='before')
+    @classmethod
+    def sanitize_text_fields(cls, v: str) -> str:
+        return _sanitize(str(v))
 
 
 class SimilarQueryResult(BaseModel):
@@ -46,6 +65,9 @@ class GenerationStatusResponse(BaseModel):
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     material_id: Optional[str] = None  # set when status == "completed"
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    cost_usd: Optional[float] = None
 
 
 class GenerationListItem(BaseModel):

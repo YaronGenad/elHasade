@@ -39,6 +39,138 @@ import { getErrorMessage } from '../api/client';
 import { MaterialVersionItem } from '../types';
 import { AxiosError } from 'axios';
 
+// ── Roadmap summary display ───────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const RoadmapSummary: React.FC<{ result: Record<string, any> }> = ({ result }) => {
+  const roadmap = result?.roadmap ?? {};
+  const rounds: Array<Record<string, unknown>> = roadmap?.rounds ?? [];
+  const goals = roadmap?.learning_goals ?? {};
+  const steamConnections: string[] = roadmap?.steam_connections ?? [];
+
+  const GoalList: React.FC<{ items: string[] }> = ({ items }) => (
+    <Box component="ul" sx={{ m: 0, pl: 2.5, '& li': { mb: 0.5 } }}>
+      {items.map((item: string, i: number) => (
+        <Typography key={i} component="li" variant="body2">{item}</Typography>
+      ))}
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {/* Unit title + text type */}
+      {roadmap.unit_title && (
+        <Box>
+          <Typography variant="h5" fontWeight={700} gutterBottom>
+            {roadmap.unit_title}
+          </Typography>
+          {roadmap.central_text_type && (
+            <Typography variant="body1" color="text.secondary">
+              סוג טקסט: {roadmap.central_text_type}
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {/* STEAM connections */}
+      {steamConnections.length > 0 && (
+        <Box>
+          <Typography variant="subtitle2" fontWeight={600} gutterBottom>חיבורי STEAM</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {steamConnections.map((s: string, i: number) => (
+              <Chip key={i} label={s} size="small" color="primary" variant="outlined" />
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      {/* Learning goals */}
+      {(goals.knowledge?.length || goals.skills?.length || goals.values?.length) ? (
+        <Box>
+          <Typography variant="subtitle2" fontWeight={600} gutterBottom>מטרות לימוד</Typography>
+          <Grid container spacing={2}>
+            {goals.knowledge?.length > 0 && (
+              <Grid item xs={12} sm={4}>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>ידע</Typography>
+                <GoalList items={goals.knowledge} />
+              </Grid>
+            )}
+            {goals.skills?.length > 0 && (
+              <Grid item xs={12} sm={4}>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>מיומנויות</Typography>
+                <GoalList items={goals.skills} />
+              </Grid>
+            )}
+            {goals.values?.length > 0 && (
+              <Grid item xs={12} sm={4}>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>ערכים</Typography>
+                <GoalList items={goals.values} />
+              </Grid>
+            )}
+          </Grid>
+        </Box>
+      ) : null}
+
+      {/* Per-round breakdown */}
+      {rounds.length > 0 && (
+        <Box>
+          <Typography variant="subtitle2" fontWeight={600} gutterBottom>פירוט סבבים</Typography>
+          {rounds.map((rnd: Record<string, unknown>, idx: number) => {
+            const comp = rnd.comprehension as Record<string, string> | undefined;
+            const methods = rnd.methods as Record<string, string> | undefined;
+            const precision = rnd.precision as Record<string, string> | undefined;
+            const vocab = rnd.vocabulary as Record<string, string> | undefined;
+            return (
+              <Accordion key={idx} disableGutters elevation={0}
+                sx={{ border: '1px solid', borderColor: 'divider', mb: 1, borderRadius: '8px !important', '&:before': { display: 'none' } }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Chip label={`${rnd.round ?? idx + 1}`} size="small" color="primary" sx={{ minWidth: 32 }} />
+                    <Typography fontWeight={500}>סבב {rnd.round ?? idx + 1}</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    {comp && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="primary" fontWeight={700}>הבנת הנקרא — {comp.text_type}</Typography>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>{comp.description}</Typography>
+                        {comp.discussion_focus && (
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                            דיון: {comp.discussion_focus}
+                          </Typography>
+                        )}
+                      </Grid>
+                    )}
+                    {methods && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="primary" fontWeight={700}>שיטות — {methods.writing_type}</Typography>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>{methods.description}</Typography>
+                      </Grid>
+                    )}
+                    {precision && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="primary" fontWeight={700}>דיוק — {precision.activity_type}</Typography>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>{precision.description}</Typography>
+                      </Grid>
+                    )}
+                    {vocab && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="primary" fontWeight={700}>אוצר מילים</Typography>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>{(vocab as Record<string, string>).description}</Typography>
+                      </Grid>
+                    )}
+                  </Grid>
+                </AccordionDetails>
+              </Accordion>
+            );
+          })}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
 // File type definitions per round
 interface FileDefinition {
   key: string;
@@ -565,23 +697,8 @@ export const GenerationDetailPage: React.FC = () => {
                 }
               />
               <Divider />
-              <CardContent>
-                <Box
-                  component="pre"
-                  sx={{
-                    bgcolor: 'grey.50',
-                    p: 2,
-                    borderRadius: 1,
-                    overflow: 'auto',
-                    fontSize: '0.8rem',
-                    maxHeight: 400,
-                    fontFamily: 'monospace',
-                    direction: 'ltr',
-                    textAlign: 'left',
-                  }}
-                >
-                  {JSON.stringify(data.result, null, 2)}
-                </Box>
+              <CardContent sx={{ p: 3 }}>
+                <RoadmapSummary result={data.result as Record<string, unknown>} />
               </CardContent>
             </Card>
           )}
