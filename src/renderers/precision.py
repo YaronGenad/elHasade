@@ -1,13 +1,14 @@
-from typing import Dict
+from typing import Dict, Optional
 from ..config import STATION_COLORS
 from .css import get_css, ENGLISH_LABELS
 from .header import render_header
 
 
-def render_precision(title: str, round_num: int, data: Dict, english_mode: bool = False) -> str:
+def render_precision(title: str, round_num: int, data: Dict, english_mode: bool = False,
+                     topic_image: Optional[str] = None) -> str:
     # ── STEAM HANDS-ON branch ──────────────────────────────────────
     if data.get('is_hands_on'):
-        return _render_stem_precision(title, round_num, data)
+        return _render_stem_precision(title, round_num, data, topic_image=topic_image)
 
     # ── Language / English grammar branch ─────────────────────────
     if english_mode:
@@ -93,12 +94,30 @@ def render_precision(title: str, round_num: int, data: Dict, english_mode: bool 
         </div>
         """
 
+    # Topic image float
+    image_html = ""
+    if topic_image:
+        try:
+            from ..images import ImageService
+            data_url = ImageService.to_data_url(topic_image)
+            c = STATION_COLORS['precision']
+            image_html = f"""
+            <div style="float:left; margin:0 0 12px 16px; clear:left;">
+                <img src="{data_url}"
+                     style="width:150px; height:100px; object-fit:cover;
+                            border-radius:10px; border:3px solid {c['border']};
+                            box-shadow:0 3px 8px rgba(0,0,0,0.18); display:block;" alt="">
+            </div>"""
+        except Exception:
+            pass
+
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
 <style>{get_css('precision')}</style></head>
 <body>
 {render_header(title, round_num, 'precision', english_mode=english_mode)}
+{image_html}
 <div class="instruction-box">📌 {data.get('title', '')} — {instruction_suffix}</div>
 {dictation_html}
 {exercises_html}
@@ -107,7 +126,8 @@ def render_precision(title: str, round_num: int, data: Dict, english_mode: bool 
 </body></html>"""
 
 
-def _render_stem_precision(title: str, round_num: int, data: Dict) -> str:
+def _render_stem_precision(title: str, round_num: int, data: Dict,
+                           topic_image: Optional[str] = None) -> str:
     """Renders the STEAM HANDS-ON lab card for the precision station."""
     c = STATION_COLORS['precision']
 
@@ -210,12 +230,28 @@ def _render_stem_precision(title: str, round_num: int, data: Dict) -> str:
         <div class="tl-red"><div class="tl-label">🔴 מאתגר</div>{dl.get('red', '')}</div>
     </div>""" if dl else ""
 
+    stem_image_html = ""
+    if topic_image:
+        try:
+            from ..images import ImageService
+            data_url = ImageService.to_data_url(topic_image)
+            stem_image_html = f"""
+            <div style="float:left; margin:0 0 12px 16px; clear:left;">
+                <img src="{data_url}"
+                     style="width:150px; height:100px; object-fit:cover;
+                            border-radius:10px; border:3px solid {c['border']};
+                            box-shadow:0 3px 8px rgba(0,0,0,0.18); display:block;" alt="">
+            </div>"""
+        except Exception:
+            pass
+
     return f"""<!DOCTYPE html>
 <html dir="rtl" lang="he">
 <head><meta charset="UTF-8"><title>תחנת דיוק STEAM - {title} - סבב {round_num}</title>
 <style>{get_css('precision')}</style></head>
 <body>
 {render_header(title, round_num, 'precision')}
+{stem_image_html}
 <div class="instruction-box">
     <span style="background:{c['primary']}; color:white; padding:3px 10px; border-radius:12px; font-size:12px; margin-left:8px;">{emoji} {label}</span>
     📌 {data.get('title', '')} — תחנת HANDS-ON: בצע/י את הפעילות ותעד/י את הממצאים

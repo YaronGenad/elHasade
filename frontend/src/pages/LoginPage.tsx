@@ -14,7 +14,6 @@ import InputAdornment from '@mui/material/InputAdornment';
 import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
 import CircularProgress from '@mui/material/CircularProgress';
-import GrassIcon from '@mui/icons-material/Grass';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -83,16 +82,20 @@ export const LoginPage: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        bgcolor: 'background.default',
+        background: 'linear-gradient(150deg, #003d1a 0%, #1e6b3a 45%, #4c9a62 100%)',
         p: 2,
       }}
     >
-      <Card sx={{ maxWidth: 440, width: '100%' }}>
+      <Card sx={{ maxWidth: 440, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.25)' }}>
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           {/* Header */}
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <GrassIcon aria-hidden="true" sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
-            <Typography variant="h4" color="primary" gutterBottom>
+            <Box component="img"
+              src="/logo.jpg"
+              alt="אל השד״ה"
+              sx={{ height: 80, width: 'auto', mb: 1.5, borderRadius: 2 }}
+            />
+            <Typography variant="h4" color="primary" gutterBottom fontWeight={800}>
               {t('common.appName')}
             </Typography>
             <Typography variant="body1" color="text.secondary">

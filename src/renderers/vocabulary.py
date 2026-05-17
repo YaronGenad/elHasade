@@ -7,7 +7,7 @@ from .header import render_header
 
 def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool = False) -> str:
     # ── STEAM bilingual game branch ────────────────────────────────
-    activity_type = data.get('activity_type') or data.get('game_type', 'matching_cards')
+    activity_type = str(data.get('activity_type') or data.get('game_type') or 'matching_cards')
     if activity_type.startswith('stem_') or data.get('bilingual'):
         return _render_stem_vocabulary(title, round_num, data)
     # ── Language / English vocabulary branch ──────────────────────
@@ -87,7 +87,7 @@ def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool
     if activity_type in ("matching_cards", "idiom_cards"):
         term_cards = "".join([
             f'<div class="cut-card cut-card-term">{w.get("word", "")}\n'
-            f'<div style="font-size:10px;color:#888;font-weight:400;">{w.get("example", "")[:40]}</div></div>'
+            f'<div style="font-size:10px;color:#888;font-weight:400;">{str(w.get("example") or "")[:40]}</div></div>'
             for w in words
         ])
         def_cards_shuffled = words.copy()
@@ -144,7 +144,7 @@ def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool
         sents_html = "".join([f"""
         <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px; font-size:13.5px;">
             <strong>{i + 1}.</strong>
-            {s.get('sentence', '').replace('_____', '<span style="border-bottom:2px solid #f1c40f; min-width:80px; display:inline-block;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>')}
+            {str(s.get('sentence') or '').replace('_____', '<span style="border-bottom:2px solid #f1c40f; min-width:80px; display:inline-block;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>')}
         </div>
         """ for i, s in enumerate(sentences)])
         body_html = f"""
@@ -316,13 +316,13 @@ def _render_stem_vocabulary(title: str, round_num: int, data: Dict) -> str:
         # Also create matching pairs cards (Hebrew on one side, English on other)
         heb_cards = "".join([f'<div class="cut-card cut-card-term" style="background:{c["light"]}; border-color:{c["border"]};">'
                               f'<span style="color:{c["primary"]}; font-weight:800;">{w.get("word", "")}</span>'
-                              f'<div style="font-size:9px;color:#888;">{w.get("example","")[:35]}</div></div>'
+                              f'<div style="font-size:9px;color:#888;">{str(w.get("example") or "")[:35]}</div></div>'
                               for w in words])
         eng_cards_shuffled = words.copy()
         random.shuffle(eng_cards_shuffled)
         eng_cards = "".join([f'<div class="cut-card cut-card-def">'
                               f'<strong style="font-size:12px;">{w.get("english","")}</strong>'
-                              f'<div style="font-size:10px;color:#666;margin-top:3px;">{w.get("definition","")[:50]}</div></div>'
+                              f'<div style="font-size:10px;color:#666;margin-top:3px;">{str(w.get("definition") or "")[:50]}</div></div>'
                               for w in eng_cards_shuffled])
 
         cards_html = f"""

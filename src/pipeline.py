@@ -10,6 +10,7 @@ from .config import (
     GEMINI_FLASH_INPUT_COST_PER_1M, GEMINI_FLASH_OUTPUT_COST_PER_1M,
     GEMINI_MAX_COST_PER_GENERATION_USD,
 )
+from .images import ImageService
 
 _PROVIDER_LABEL = "Gemini"
 log = structlog.get_logger(__name__)
@@ -43,7 +44,7 @@ from .renderers import (
     render_teacher_prep,
     render_answer_key,
 )
-from .pdf import save_html, make_pdf
+from .pdf import save_html, make_pdf_isolated as make_pdf
 
 
 def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> Dict[str, Any]:
@@ -157,12 +158,25 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     content = {}
     round_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
 
+    # Pre-fetch topic images (Pexels first, Imagen fallback); instant if cached
+    if not english_mode:
+        _img = ImageService()
+        topic_images = {
+            "comprehension": _img.fetch(topic, grade, "comprehension"),
+            "methods":       _img.fetch(topic, grade, "methods"),
+            "precision":     _img.fetch(topic, grade, "precision"),
+        }
+        log.info("images_fetched", cached=[k for k, v in topic_images.items() if v])
+    else:
+        topic_images = {"comprehension": None, "methods": None, "precision": None}
+
     # Accumulated cost so far across this generation (passed in from caller)
     accumulated_cost_usd: float = user_input.get('_accumulated_cost_usd', 0.0)
 
     def _call_llm(prompt, station_name: str) -> Dict[str, Any]:
         """Wrap call_gemini: accumulate usage, enforce cost cap, raise on LLM errors."""
         nonlocal accumulated_cost_usd
+        log.info("llm_call_start", station=station_name, round=round_num, topic=topic, prompt_chars=len(prompt))
         try:
             result, usage = call_gemini(prompt)
         except Exception as exc:
@@ -215,6 +229,18 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
                 detail=str(exc),
             ) from exc
 
+    def _render(station_name: str, fn, *args, **kwargs) -> str:
+        """Call a renderer function and convert any exception to PDFRenderError."""
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            log.error("renderer_failed", station=station_name, round=round_num,
+                      error_type=type(exc).__name__, error=str(exc))
+            raise PDFRenderError(
+                message=f"Renderer failed: {station_name} (round {round_num}): {type(exc).__name__}: {exc}",
+                detail=str(exc),
+            ) from exc
+
     # Station 1: Comprehension
     log.info("station_start", station="comprehension", step="1/4", round=round_num)
     if steam_mode:
@@ -230,7 +256,8 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_complete", station="comprehension", words=word_count, paragraphs=len(comp_data.get('paragraphs', [])))
     prev_texts.append(comp_data.get('section_title', '') + ": " + comp_data.get('intro_sentence', ''))
     content['comprehension'] = comp_data
-    comp_html = render_comprehension(topic, round_num, comp_data, grade, english_mode=english_mode)
+    comp_html = _render("comprehension", render_comprehension, topic, round_num, comp_data, grade,
+                        english_mode=english_mode, topic_image=topic_images["comprehension"])
     comp_path = f"{output_dir}/{safe_name}_round{round_num}_comprehension.html"
     _save(comp_html, comp_path, "comprehension")
     files['comprehension'] = comp_path
@@ -254,7 +281,8 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     ), "methods")
     log.info("station_complete", station="methods", writing_type=meth_data.get('writing_type', ''), levels=list(meth_data.get('difficulty_levels', {}).keys()))
     content['methods'] = meth_data
-    meth_html = render_methods(topic, round_num, meth_data, english_mode=english_mode)
+    meth_html = _render("methods", render_methods, topic, round_num, meth_data,
+                        english_mode=english_mode, topic_image=topic_images["methods"])
     meth_path = f"{output_dir}/{safe_name}_round{round_num}_methods.html"
     _save(meth_html, meth_path, "methods")
     files['methods'] = meth_path
@@ -279,7 +307,8 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     ), "precision")
     log.info("station_complete", station="precision", dictation_words=len(prec_data.get('dictation_list', [])), exercises=len(prec_data.get('exercises', [])))
     content['precision'] = prec_data
-    prec_html = render_precision(topic, round_num, prec_data, english_mode=english_mode)
+    prec_html = _render("precision", render_precision, topic, round_num, prec_data,
+                        english_mode=english_mode, topic_image=topic_images["precision"])
     prec_path = f"{output_dir}/{safe_name}_round{round_num}_precision.html"
     _save(prec_html, prec_path, "precision")
     files['precision'] = prec_path
@@ -305,7 +334,8 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     ), "vocabulary")
     log.info("station_complete", station="vocabulary", activity_type=vocab_data.get('activity_type', ''), title=vocab_data.get('title', ''))
     content['vocabulary'] = vocab_data
-    vocab_html = render_vocabulary(topic, round_num, vocab_data, english_mode=english_mode)
+    vocab_html = _render("vocabulary", render_vocabulary, topic, round_num, vocab_data,
+                         english_mode=english_mode)
     vocab_path = f"{output_dir}/{safe_name}_round{round_num}_vocabulary.html"
     _save(vocab_html, vocab_path, "vocabulary")
     files['vocabulary'] = vocab_path
@@ -315,14 +345,16 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     teacher_prep_fn = build_english_teacher_prep_prompt if english_mode else build_teacher_prep_prompt
     teacher_data = _call_llm(teacher_prep_fn(subject, topic, grade, round_num, content), "teacher_prep")
     content['teacher'] = teacher_data
-    teacher_html = render_teacher_prep(topic, round_num, teacher_data, content, english_mode=english_mode)
+    teacher_html = _render("teacher_prep", render_teacher_prep, topic, round_num, teacher_data,
+                           content, english_mode=english_mode)
     teacher_path = f"{output_dir}/{safe_name}_round{round_num}_teacher_prep.html"
     _save(teacher_html, teacher_path, "teacher_prep")
     files['teacher_prep'] = teacher_path
 
     # Answer Key
     log.info("station_start", station="answer_key", round=round_num)
-    answers_html = render_answer_key(topic, round_num, prec_data, vocab_data, meth_data, english_mode=english_mode)
+    answers_html = _render("answer_key", render_answer_key, topic, round_num, prec_data,
+                           vocab_data, meth_data, english_mode=english_mode)
     answers_path = f"{output_dir}/{safe_name}_round{round_num}_answer_key.html"
     _save(answers_html, answers_path, "answer_key")
     files['answer_key'] = answers_path
@@ -331,13 +363,13 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("pdf_creation_start", round=round_num)
     student_files = [files['comprehension'], files['methods'], files['precision'], files['vocabulary']]
     student_pdf = f"{output_dir}/{safe_name}_round{round_num}_STUDENT.pdf"
-    if not make_pdf(student_files, student_pdf, topic, f"סבב {round_num} — לתלמיד"):
+    if not make_pdf(student_files, student_pdf, topic, f"סבב {round_num} — לתלמיד", subject=subject, grade=grade):
         log.warning("student_pdf_failed", round=round_num, path=student_pdf)
     files['student_pdf'] = student_pdf
 
     teacher_files = [files['teacher_prep']] + student_files + [files['answer_key']]
     teacher_pdf = f"{output_dir}/{safe_name}_round{round_num}_TEACHER.pdf"
-    if not make_pdf(teacher_files, teacher_pdf, topic, f"סבב {round_num} — למורה"):
+    if not make_pdf(teacher_files, teacher_pdf, topic, f"סבב {round_num} — למורה", subject=subject, grade=grade):
         log.warning("teacher_pdf_failed", round=round_num, path=teacher_pdf)
     files['teacher_pdf'] = teacher_pdf
 
@@ -385,13 +417,17 @@ def generate_all_rounds(user_input: Dict[str, Any], roadmap: Dict[str, Any], out
         round_input['_accumulated_cost_usd'] = accumulated_cost_usd
         try:
             result = generate_round(round_input, roadmap, i, output_dir, prev_texts)
-        except (LLMAPIError, PDFRenderError, CostLimitExceededError) as exc:
-            log.error("round_failed", round=i, total=total, error=str(exc))
+        except CostLimitExceededError as exc:
+            log.error("round_failed", round=i, total=total, error=str(exc),
+                      error_type=type(exc).__name__, exc_info=True)
             failed_rounds.append(i)
             all_results.append({"error": str(exc), "round": i})
-            if isinstance(exc, CostLimitExceededError):
-                # Abort remaining rounds immediately
-                break
+            break
+        except Exception as exc:
+            log.error("round_failed", round=i, total=total, error=str(exc),
+                      error_type=type(exc).__name__, exc_info=True)
+            failed_rounds.append(i)
+            all_results.append({"error": str(exc), "round": i})
             continue
         prev_texts = result.get('prev_texts', prev_texts)
         accumulated_cost_usd = result.get('_accumulated_cost_usd', accumulated_cost_usd)
@@ -421,11 +457,13 @@ def generate_all_rounds(user_input: Dict[str, Any], roadmap: Dict[str, Any], out
 
     log.info("full_unit_pdf_start", total_rounds=total)
     unit_student_pdf = f"{output_dir}/{safe_name}_FULL_STUDENT.pdf"
-    if not make_pdf([f for f in all_student_files if f], unit_student_pdf, topic, f"יחידה מלאה — {total} סבבים — לתלמיד"):
+    subject = user_input.get('subject', '')
+    grade = user_input.get('grade', '')
+    if not make_pdf([f for f in all_student_files if f], unit_student_pdf, topic, f"יחידה מלאה — {total} סבבים — לתלמיד", subject=subject, grade=grade):
         log.warning("full_student_pdf_failed", path=unit_student_pdf)
 
     unit_teacher_pdf = f"{output_dir}/{safe_name}_FULL_TEACHER.pdf"
-    if not make_pdf([f for f in all_teacher_files if f], unit_teacher_pdf, topic, f"יחידה מלאה — {total} סבבים — למורה"):
+    if not make_pdf([f for f in all_teacher_files if f], unit_teacher_pdf, topic, f"יחידה מלאה — {total} סבבים — למורה", subject=subject, grade=grade):
         log.warning("full_teacher_pdf_failed", path=unit_teacher_pdf)
 
     total_cost_usd = (

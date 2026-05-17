@@ -1,5 +1,17 @@
 from typing import Any, Dict, List
-from ..config import get_grade_level
+from ..config import get_grade_level, needs_nikud
+
+
+def _nikud_note(grade: str) -> str:
+    """Return a nikud instruction line for young grades, empty string otherwise."""
+    if not needs_nikud(grade):
+        return ""
+    return (
+        "\n⚠️ חשוב מאוד: כיתה זו צעירה (כיתות א′–ג′). "
+        "יש לכתוב את כל הטקסט העברי עם ניקוד מלא וסימני דגש. "
+        "כל מילה חייבת לכלול ניקוד. לדוגמה: הַכֶּלֶב אָכַל לֶחֶם. "
+        "אַל תִּכְתֹּב אַף מִלָּה בְּלִי נִיקּוּד.\n"
+    )
 
 
 def build_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> str:
@@ -84,8 +96,7 @@ def build_comprehension_prompt(subject: str, topic: str, grade: str,
     text_desc = round_plan.get('comprehension', {}).get('description', '')
     disc_focus = round_plan.get('comprehension', {}).get('discussion_focus', 'קונפליקט ודילמה')
 
-    return f"""כתוב טקסט לתחנת ההבנה בשיטת א"ל השד"ה.
-
+    return f"""כתוב טקסט לתחנת ההבנה בשיטת א"ל השד"ה.{_nikud_note(grade)}
 <user_input>
 נושא: {subject} — {topic}
 כיתה: {grade} | גיל: {gl['age']} | שפה: {gl['language']}
@@ -144,8 +155,7 @@ def build_methods_prompt(subject: str, topic: str, grade: str,
     for p in comprehension_text.get('paragraphs', [])[:2]:
         text_summary += p.get('text', '')[:200] + "... "
 
-    return f"""צור משימת כתיבה מובנית לתחנת השיטות — א"ל השד"ה.
-
+    return f"""צור משימת כתיבה מובנית לתחנת השיטות — א"ל השד"ה.{_nikud_note(grade)}
 <user_input>
 נושא: {subject} — {topic} | סבב {round_num}
 כיתה: {grade} | גיל: {gl['age']}
@@ -204,8 +214,7 @@ def build_precision_prompt(subject: str, topic: str, grade: str,
     activity_type = round_plan.get('precision', {}).get('activity_type', 'הכתבה ושורשים')
     precision_desc = round_plan.get('precision', {}).get('description', '')
 
-    return f"""צור פעילות לתחנת הדיוק (לשון ודקדוק) — א"ל השד"ה.
-
+    return f"""צור פעילות לתחנת הדיוק (לשון ודקדוק) — א"ל השד"ה.{_nikud_note(grade)}
 <user_input>
 נושא: {subject} — {topic} | סבב {round_num}
 כיתה: {grade} | גיל: {gl['age']}
@@ -280,8 +289,7 @@ def build_vocabulary_prompt(subject: str, topic: str, grade: str,
 הפעילות חייבת לערב גוף, ידיים, תנועה — "מה שנצרב בעור נשמר לנצח"
 """ if is_physical else ""
 
-    return f"""צור פעילות לתחנת הרחבת אוצר מילים — א"ל השד"ה.
-
+    return f"""צור פעילות לתחנת הרחבת אוצר מילים — א"ל השד"ה.{_nikud_note(grade)}
 <user_input>
 נושא: {subject} — {topic} | סבב {round_num}
 כיתה: {grade} | גיל: {gl['age']}

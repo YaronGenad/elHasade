@@ -1,5 +1,10 @@
+import base64
+import json
 import os
+import subprocess
+import sys
 import tempfile
+from pathlib import Path
 from typing import Any, List
 
 import structlog
@@ -45,24 +50,117 @@ def save_html(content: str, path: str) -> None:
     log.info("html_saved", file=os.path.basename(path))
 
 
-def _make_cover_html(title: str, cover_subtitle: str) -> str:
+def _logo_data_url() -> str:
+    logo_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'LOGO.jfif'))
+    if os.path.exists(logo_path):
+        with open(logo_path, 'rb') as f:
+            data = base64.b64encode(f.read()).decode('ascii')
+        return f"data:image/jpeg;base64,{data}"
+    return ""
+
+
+def _make_cover_html(title: str, cover_subtitle: str, subject: str = "", grade: str = "") -> str:
+    logo_url = _logo_data_url()
+    logo_img = f'<img src="{logo_url}" class="logo" alt="לוגו" />' if logo_url else ""
+    subject_display = subject.strip() or title
+    grade_display = grade.strip()
+    topic_display = title.strip()
+
     return f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
     <style>
-        @page{{size:A4;margin:0;}}
-        body{{margin:0;display:flex;flex-direction:column;justify-content:center;
-        align-items:center;height:100vh;
-        background:linear-gradient(135deg,#4a235a,#8e44ad);
-        font-family:Arial,sans-serif;color:white;text-align:center;direction:rtl;}}
-        h1{{font-size:40px;margin-bottom:10px;font-weight:800;}}
-        h2{{font-size:24px;font-weight:400;opacity:0.9;margin-bottom:20px;}}
-        .badge{{background:rgba(255,255,255,0.2);padding:8px 20px;
-        border-radius:16px;font-size:14px;margin:4px;display:inline-block;}}
+        @page {{ size: A4; margin: 0; }}
+        body {{
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(150deg, #3b1a4a 0%, #7b2d8b 50%, #5c1a7a 100%);
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            direction: rtl;
+            box-sizing: border-box;
+            padding: 40px 60px;
+            gap: 0;
+        }}
+        .logo {{
+            width: 110px;
+            height: auto;
+            border-radius: 14px;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+            margin-bottom: 22px;
+        }}
+        .method-title {{
+            font-size: 30px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }}
+        .method-sub {{
+            font-size: 13px;
+            opacity: 0.7;
+            letter-spacing: 1px;
+            margin-bottom: 28px;
+        }}
+        .divider {{
+            width: 50px;
+            height: 2px;
+            background: rgba(255,255,255,0.4);
+            border-radius: 2px;
+            margin: 0 auto 28px;
+        }}
+        .info-block {{
+            background: rgba(255,255,255,0.13);
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 18px;
+            padding: 24px 48px;
+            margin-bottom: 24px;
+            min-width: 300px;
+        }}
+        .info-row {{
+            font-size: 20px;
+            font-weight: 700;
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }}
+        .info-label {{
+            font-weight: 400;
+            opacity: 0.75;
+            font-size: 16px;
+        }}
+        .subtitle-badge {{
+            background: rgba(255,255,255,0.22);
+            border: 1.5px solid rgba(255,255,255,0.5);
+            border-radius: 24px;
+            padding: 11px 32px;
+            font-size: 17px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: 0.5px;
+        }}
+        .stations {{
+            font-size: 13px;
+            opacity: 0.7;
+            letter-spacing: 2px;
+        }}
     </style></head><body>
-    <div style="font-size:60px;margin-bottom:16px;">&#128218;</div>
-    <h1>א"ל השד"ה</h1>
-    <h2>{title}</h2>
-    <div class="badge">{cover_subtitle}</div>
-    <div class="badge">הבנה | שיטות | דיוק | אוצר מילים</div>
+    {logo_img}
+    <div class="method-title">שיטת א"ל השד"ה</div>
+    <div class="method-sub">AL-HASADEH METHOD</div>
+    <div class="divider"></div>
+    <div class="info-block">
+        <div class="info-row"><span class="info-label">שיעור:</span> {subject_display}</div>
+        <div class="info-row"><span class="info-label">נושא:</span> {topic_display}</div>
+        <div class="info-row"><span class="info-label">כיתה:</span> {grade_display}</div>
+    </div>
+    <div class="subtitle-badge">{cover_subtitle}</div>
+    <div class="stations">הבנה &nbsp;|&nbsp; שיטות &nbsp;|&nbsp; דיוק &nbsp;|&nbsp; אוצר מילים</div>
     </body></html>"""
 
 
@@ -108,7 +206,63 @@ def _merge_pdfs(pdf_paths: List[str], output_path: str) -> None:
         ) from exc
 
 
-def make_pdf(html_files: List[str], output_path: str, title: str, cover_subtitle: str = "") -> bool:
+_PROJECT_ROOT = str(Path(__file__).parent.parent)
+
+_MAKE_PDF_SUBPROCESS_SCRIPT = """
+import sys, json
+sys.path.insert(0, sys.argv[1])
+from src.pdf import make_pdf
+args = json.loads(sys.stdin.read())
+ok = make_pdf(**args)
+sys.exit(0 if ok else 1)
+"""
+
+
+def make_pdf_isolated(
+    html_files: List[str],
+    output_path: str,
+    title: str,
+    cover_subtitle: str = "",
+    subject: str = "",
+    grade: str = "",
+) -> bool:
+    """Run make_pdf in a subprocess to isolate Playwright from the FastAPI async runtime."""
+    payload = json.dumps({
+        "html_files": html_files,
+        "output_path": output_path,
+        "title": title,
+        "cover_subtitle": cover_subtitle,
+        "subject": subject,
+        "grade": grade,
+    })
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", _MAKE_PDF_SUBPROCESS_SCRIPT, _PROJECT_ROOT],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=180,
+            env={**os.environ},
+        )
+        if result.returncode != 0:
+            log.error(
+                "make_pdf_subprocess_failed",
+                output_path=output_path,
+                returncode=result.returncode,
+                stderr=result.stderr[:800],
+            )
+            return False
+        return True
+    except subprocess.TimeoutExpired:
+        log.error("make_pdf_subprocess_timeout", output_path=output_path, timeout_seconds=180)
+        return False
+    except Exception as exc:
+        log.error("make_pdf_subprocess_error", output_path=output_path, error=str(exc))
+        return False
+
+
+def make_pdf(html_files: List[str], output_path: str, title: str, cover_subtitle: str = "",
+             subject: str = "", grade: str = "") -> bool:
     if not PDF_AVAILABLE:
         log.warning("pdf_skipped_playwright_missing", hint="pip install playwright && playwright install chromium")
         return False
@@ -128,7 +282,7 @@ def make_pdf(html_files: List[str], output_path: str, title: str, cover_subtitle
                 suffix=".pdf", prefix="cover_", dir=output_dir, delete=False
             )
             cover_tmp.close()
-            _html_to_pdf(page, _make_cover_html(title, cover_subtitle), cover_tmp.name)
+            _html_to_pdf(page, _make_cover_html(title, cover_subtitle, subject, grade), cover_tmp.name)
             tmp_pdfs.append(cover_tmp.name)
 
             # Each station HTML → individual PDF

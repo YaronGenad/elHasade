@@ -13,19 +13,19 @@ export const theme = createTheme({
   direction: 'rtl',
   palette: {
     primary: {
-      main: '#00796b', // teal-700 — calm educational green
-      light: '#48a999',
-      dark: '#004c40',
+      main: '#1e6b3a',   // ירוק שדה עמוק — מהלוגו
+      light: '#4c9a62',
+      dark: '#003d1a',
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#26a69a', // teal-400
-      light: '#64d8cb',
-      dark: '#00766c',
+      main: '#6a1b9a',   // סגול השיטה — מהרנדרינג
+      light: '#9c4dcc',
+      dark: '#4a235a',
       contrastText: '#ffffff',
     },
     background: {
-      default: '#f5f7f6',
+      default: '#f2f7f3',  // גוון ירוק עדין
       paper: '#ffffff',
     },
     success: {

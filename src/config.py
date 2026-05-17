@@ -1,13 +1,14 @@
+import re
 from typing import Any, Dict
 
 
 # ─── LLM Configuration ─────────────────────────────────────────────────────────
-GEMINI_MODEL: str = "models/gemini-flash-latest"
+GEMINI_MODEL: str = "gemini-2.5-flash"
 GEMINI_MAX_RETRIES: int = 3
 GEMINI_RATE_LIMIT_BACKOFF_BASE: int = 20  # seconds, multiplied by (attempt + 1)
 
 # ─── Token & Cost Configuration ─────────────────────────────────────────────
-GEMINI_MAX_OUTPUT_TOKENS: int = 4096          # per LLM call; prevents runaway output
+GEMINI_MAX_OUTPUT_TOKENS: int = 65536         # model maximum — no artificial cap
 # Gemini Flash 2.0 pricing (USD per 1M tokens)
 GEMINI_FLASH_INPUT_COST_PER_1M: float = 0.10
 GEMINI_FLASH_OUTPUT_COST_PER_1M: float = 0.40
@@ -111,6 +112,20 @@ _GRADE_MAP = {
 def get_grade_level(grade: str) -> Dict:
     g = grade.replace("׳", "").replace("'", "")
     return GRADE_LEVELS.get(_GRADE_MAP.get(g, "ז-ח"), GRADE_LEVELS["ז-ח"])
+
+
+def needs_nikud(grade: str) -> bool:
+    """Returns True for grades alef–gimel (ages 6–9) where vowel marks aid reading."""
+    # Strip common Hebrew/English prefix words to extract just the grade identifier
+    clean = grade.replace("׳", "").replace("'", "")
+    clean = re.sub(r'כיתה|שנה|grade|year', '', clean, flags=re.IGNORECASE).strip()
+    # Single Hebrew grade letter alef, bet, or gimel
+    if clean and clean[0] in ('א', 'ב', 'ג'):
+        return True
+    # Numeric grade 1-3
+    if re.fullmatch(r'[1-3]', clean):
+        return True
+    return False
 
 
 # ─── STEM / STEAM ───────────────────────────────────────────────────────────

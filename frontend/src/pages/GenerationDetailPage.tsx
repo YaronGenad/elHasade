@@ -22,6 +22,7 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DownloadIcon from '@mui/icons-material/Download';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SchoolIcon from '@mui/icons-material/School';
@@ -42,7 +43,93 @@ import { AxiosError } from 'axios';
 // ── Roadmap summary display ───────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const RoadmapSummary: React.FC<{ result: Record<string, any> }> = ({ result }) => {
+const printRoadmap = (roadmap: Record<string, any>, genInfo?: Record<string, any>) => {
+  const rounds = roadmap?.rounds ?? [];
+  const goals = roadmap?.learning_goals ?? {};
+  const goalsList = [
+    ...(goals.knowledge ?? []),
+    ...(goals.skills ?? []),
+    ...(goals.values ?? []),
+  ].map((g: string) => `<span class="pill">${g}</span>`).join('');
+
+  const stationColors: Record<string, string> = {
+    comprehension: '#c0392b',
+    methods: '#1a5276',
+    precision: '#1e8449',
+    vocabulary: '#7d6608',
+  };
+  const stationLabels: Record<string, string> = {
+    comprehension: '🔴 הבנת הנקרא',
+    methods: '🔵 שיטות',
+    precision: '🟢 דיוק',
+    vocabulary: '🟡 אוצר מילים',
+  };
+
+  const roundsRows = rounds.map((rnd: Record<string, any>) => {
+    const cells = ['comprehension', 'methods', 'precision', 'vocabulary'].map((key) => {
+      const s = rnd[key] as Record<string, string> | undefined;
+      const type = s?.text_type ?? s?.writing_type ?? s?.activity_type ?? s?.game_type ?? s?.input_type ?? s?.thinking_framework ?? s?.hands_on_type ?? '';
+      const desc = s?.description ?? '';
+      const color = stationColors[key];
+      const label = stationLabels[key];
+      return `<td style="border:1.5px solid #ddd;padding:10px;vertical-align:top;background:${color}18;">
+        <div style="font-weight:700;color:${color};font-size:11px;">${label} — ${type}</div>
+        <div style="font-size:12px;margin-top:4px;">${desc}</div>
+      </td>`;
+    }).join('');
+    return `<tr><td style="border:1.5px solid #ddd;padding:10px;font-weight:800;text-align:center;background:#f8f9fa;">${rnd.round ?? ''}</td>${cells}</tr>`;
+  }).join('');
+
+  const subject = genInfo?.subject ?? '';
+  const topic = genInfo?.topic ?? '';
+  const grade = genInfo?.grade ?? '';
+
+  const html = `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
+  <title>מפת דרכים — ${roadmap.unit_title ?? topic}</title>
+  <style>
+    @page { size: A4 landscape; margin: 1.5cm; }
+    body { font-family: Arial, sans-serif; direction: rtl; color: #222; }
+    .header { background: linear-gradient(135deg,#4a235a,#8e44ad); color: white; padding: 16px 20px; border-radius: 10px; margin-bottom: 16px; }
+    .header h1 { margin: 0 0 4px; font-size: 22px; }
+    .header .meta { font-size: 13px; opacity: 0.85; }
+    .pills { margin: 12px 0; }
+    .pill { background: #eaf2ff; border: 1px solid #2c5aa0; color: #1a3a6b; border-radius: 12px; padding: 3px 10px; font-size: 12px; margin: 2px; display: inline-block; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #4a235a; color: white; padding: 10px; font-size: 13px; }
+    @media print { button { display: none; } }
+  </style></head><body>
+  <div class="header">
+    <h1>📋 מפת דרכים — ${roadmap.unit_title ?? topic}</h1>
+    <div class="meta">
+      ${subject ? `שיעור: ${subject} &nbsp;|&nbsp;` : ''}
+      ${topic ? `נושא: ${topic} &nbsp;|&nbsp;` : ''}
+      ${grade ? `כיתה: ${grade} &nbsp;|&nbsp;` : ''}
+      שיטת א"ל השד"ה &nbsp;|&nbsp; ${rounds.length} סבבים
+    </div>
+  </div>
+  ${goalsList ? `<div class="pills"><strong>מטרות לימוד:</strong> ${goalsList}</div>` : ''}
+  <table>
+    <tr>
+      <th>סבב</th>
+      <th>🔴 הבנת הנקרא</th>
+      <th>🔵 שיטות</th>
+      <th>🟢 דיוק</th>
+      <th>🟡 אוצר מילים</th>
+    </tr>
+    ${roundsRows}
+  </table>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const RoadmapSummary: React.FC<{ result: Record<string, any>; genInfo?: Record<string, any> }> = ({ result, genInfo }) => {
   const roadmap = result?.roadmap ?? {};
   const rounds: Array<Record<string, unknown>> = roadmap?.rounds ?? [];
   const goals = roadmap?.learning_goals ?? {};
@@ -58,6 +145,19 @@ const RoadmapSummary: React.FC<{ result: Record<string, any> }> = ({ result }) =
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {/* Download roadmap button */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          variant="outlined"
+          color="secondary"
+          size="small"
+          startIcon={<PictureAsPdfIcon />}
+          onClick={() => printRoadmap(roadmap, genInfo)}
+        >
+          הורד מפת דרכים PDF
+        </Button>
+      </Box>
+
       {/* Unit title + text type */}
       {roadmap.unit_title && (
         <Box>
@@ -698,7 +798,10 @@ export const GenerationDetailPage: React.FC = () => {
               />
               <Divider />
               <CardContent sx={{ p: 3 }}>
-                <RoadmapSummary result={data.result as Record<string, unknown>} />
+                <RoadmapSummary
+                  result={data.result as Record<string, unknown>}
+                  genInfo={{ subject: data.subject, topic: data.topic, grade: data.grade }}
+                />
               </CardContent>
             </Card>
           )}

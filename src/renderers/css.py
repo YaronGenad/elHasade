@@ -48,7 +48,7 @@ ENGLISH_LABELS = {
 def get_css(station: str = "comprehension") -> str:
     c = STATION_COLORS[station]
     return f"""
-    @page {{ size: A4; margin: 1.4cm 1.6cm; }}
+    @page {{ size: A4; margin: 5mm; }}
     * {{ box-sizing: border-box; }}
     body {{
         font-family: Arial, 'Arial Hebrew', sans-serif;
@@ -57,18 +57,61 @@ def get_css(station: str = "comprehension") -> str:
         color: #2c3e50;
         background: white;
         font-size: 13px;
-        margin: 0; padding: 0;
+        margin: 0;
+        padding: 0 14px 14px;
+        border: 5px solid {c['primary']};
+        border-radius: 10px;
+        min-height: calc(297mm - 10mm - 10px);
     }}
     .page-header {{
         background: linear-gradient(135deg, {c['primary']}, {c['border']});
         color: white;
-        padding: 12px 16px;
-        border-radius: 10px;
-        margin-bottom: 16px;
+        padding: 10px 14px;
+        border-radius: 8px 8px 0 0;
+        margin: 0 -14px 16px;
+        direction: ltr;
         display: flex;
-        justify-content: space-between;
+        flex-direction: row;
         align-items: center;
+        gap: 10px;
     }}
+    .header-icon-circle {{
+        width: 52px; height: 52px;
+        background: rgba(255,255,255,0.22);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+    }}
+    .header-icon-circle svg {{ width: 30px; height: 30px; display: block; }}
+    .header-center {{
+        flex: 1;
+        text-align: center;
+        direction: rtl;
+    }}
+    .header-round-badge {{
+        display: inline-block;
+        background: rgba(255,255,255,0.25);
+        border: 1.5px solid rgba(255,255,255,0.6);
+        border-radius: 20px;
+        padding: 2px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 3px;
+    }}
+    .header-station-name {{
+        font-size: 18px;
+        font-weight: 800;
+        color: white;
+    }}
+    .header-logo-img {{
+        width: 52px; height: 52px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex-shrink: 0;
+        border: 2px solid rgba(255,255,255,0.4);
+    }}
+    /* legacy classes kept for backward compat */
     .header-left {{ display: flex; align-items: center; gap: 10px; }}
     .header-icon {{
         width: 44px; height: 44px;

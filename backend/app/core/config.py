@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, env="REFRESH_TOKEN_EXPIRE_DAYS")
 
-    # LLM Provider (Gemini only)
+    # LLM Providers
     GEMINI_API_KEY: str = Field(default="", env="GEMINI_API_KEY")
+    ANTHROPIC_API_KEY: str = Field(default="", env="ANTHROPIC_API_KEY")
 
     # File Storage
     UPLOAD_DIR: str = Field(default="./uploads", env="UPLOAD_DIR")

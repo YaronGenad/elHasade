@@ -11,7 +11,6 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
-import GrassIcon from '@mui/icons-material/Grass';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -46,10 +45,18 @@ export const Navbar: React.FC = () => {
     : user?.email.charAt(0).toUpperCase() ?? '?';
 
   return (
-    <AppBar position="fixed" color="primary" elevation={2}>
+    <AppBar position="fixed" elevation={2}
+      sx={{ background: 'linear-gradient(90deg, #003d1a 0%, #1e6b3a 100%)' }}
+    >
       <Toolbar sx={{ gap: 1 }}>
         {/* Logo / Brand */}
-        <GrassIcon sx={{ ml: 0, mr: 1 }} aria-hidden="true" />
+        <Box
+          component="img"
+          src="/logo.jpg"
+          alt="אל השד״ה"
+          sx={{ height: 36, width: 'auto', borderRadius: 1, mr: 1, cursor: 'pointer' }}
+          onClick={() => navigate('/dashboard')}
+        />
         <Typography
           variant="h6"
           component="div"

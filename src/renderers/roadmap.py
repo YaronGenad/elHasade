@@ -7,7 +7,7 @@ def render_roadmap(title: str, roadmap: Dict, english_mode: bool = False) -> str
     goals_raw = roadmap.get('learning_goals', [])
     # learning_goals can be a list or a dict with knowledge/skills/values
     if isinstance(goals_raw, dict):
-        goals_flat = goals_raw.get('knowledge', []) + goals_raw.get('skills', []) + goals_raw.get('values', [])
+        goals_flat = (list(goals_raw.get('knowledge') or []) + list(goals_raw.get('skills') or []) + list(goals_raw.get('values') or []))
     else:
         goals_flat = goals_raw
     goals = "".join([

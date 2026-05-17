@@ -1,11 +1,12 @@
-from typing import Dict
+from typing import Dict, Optional
 from ..config import STATION_COLORS, get_grade_level
 from .css import get_css, ENGLISH_LABELS
 from .header import render_header
 
 
 def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
-                          english_mode: bool = False) -> str:
+                          english_mode: bool = False,
+                          topic_image: Optional[str] = None) -> str:
     gl = get_grade_level(grade)
 
     paras_html = ""
@@ -76,10 +77,12 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
     kwl = data.get('kwl_table', {})
     kwl_html = ""
     if kwl and not english_mode:
-        know_items = "".join([f'<div class="answer-line" style="margin-bottom:4px;"></div>' for _ in range(len(kwl.get('know_prompts', [])) + 1)])
-        wonder_items = "".join([f'<div class="answer-line" style="margin-bottom:4px;"></div>' for _ in range(len(kwl.get('wonder_prompts', [])) + 1)])
-        know_prompts = "".join([f'<div style="font-size:11px;color:#888;font-style:italic;margin-bottom:2px;">{p}</div>' for p in kwl.get('know_prompts', [])])
-        wonder_prompts = "".join([f'<div style="font-size:11px;color:#888;font-style:italic;margin-bottom:2px;">{p}</div>' for p in kwl.get('wonder_prompts', [])])
+        _kp = kwl.get('know_prompts') if isinstance(kwl.get('know_prompts'), list) else []
+        _wp = kwl.get('wonder_prompts') if isinstance(kwl.get('wonder_prompts'), list) else []
+        know_items = "".join([f'<div class="answer-line" style="margin-bottom:4px;"></div>' for _ in range(len(_kp) + 1)])
+        wonder_items = "".join([f'<div class="answer-line" style="margin-bottom:4px;"></div>' for _ in range(len(_wp) + 1)])
+        know_prompts = "".join([f'<div style="font-size:11px;color:#888;font-style:italic;margin-bottom:2px;">{p}</div>' for p in _kp])
+        wonder_prompts = "".join([f'<div style="font-size:11px;color:#888;font-style:italic;margin-bottom:2px;">{p}</div>' for p in _wp])
         kwl_html = f"""
         <div class="section-block" style="margin-bottom:14px;">
             <div class="section-title">\U0001f4cb \u05d8\u05d1\u05dc\u05ea KWL \u2014 \u05dc\u05e4\u05e0\u05d9 \u05d4\u05e7\u05e8\u05d9\u05d0\u05d4</div>
@@ -112,12 +115,30 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
             <div class="answer-line"></div><div class="answer-line"></div><div class="answer-line"></div>
         </div>"""
 
+    # Topic image float (right side in RTL = float:left in CSS)
+    image_html = ""
+    if topic_image:
+        try:
+            from ..images import ImageService
+            data_url = ImageService.to_data_url(topic_image)
+            c = STATION_COLORS['comprehension']
+            image_html = f"""
+            <div style="float:left; margin:0 0 12px 16px; clear:left;">
+                <img src="{data_url}"
+                     style="width:160px; height:110px; object-fit:cover;
+                            border-radius:10px; border:3px solid {c['border']};
+                            box-shadow:0 3px 8px rgba(0,0,0,0.18); display:block;" alt="">
+            </div>"""
+        except Exception:
+            pass
+
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
 <style>{get_css('comprehension')}</style></head>
 <body>
 {render_header(title, round_num, 'comprehension', english_mode=english_mode)}
+{image_html}
 <div class="instruction-box">{reading_instruction}</div>
 {kwl_html}
 <div style="background:#fafafa; border:1px solid #ddd; border-radius:10px; padding:18px 22px;">

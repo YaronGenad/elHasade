@@ -6,8 +6,13 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 
+import os
 from app.core.config import settings
 from app.core.exceptions import AppError
+
+# Push LLM keys from pydantic settings into os.environ so src/gemini.py can read them
+os.environ.setdefault("GEMINI_API_KEY", settings.GEMINI_API_KEY)
+os.environ.setdefault("ANTHROPIC_API_KEY", settings.ANTHROPIC_API_KEY)
 from app.core.logging import get_logger, setup_logging
 from app.api import auth, generations, materials, search
 from app.db.session import SessionLocal

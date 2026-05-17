@@ -2,7 +2,7 @@ import json
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 from src.pipeline import generate_roadmap, generate_all_rounds
 

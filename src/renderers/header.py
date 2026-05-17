@@ -1,6 +1,17 @@
 from typing import Dict
 from ..config import STATION_COLORS
 from .css import ENGLISH_STATION_NAMES, ENGLISH_LABELS
+from .icons import STATION_ICONS
+from .utils import logo_data_url
+
+_LOGO_URL: str = ""  # loaded once on first use
+
+
+def _get_logo() -> str:
+    global _LOGO_URL
+    if not _LOGO_URL:
+        _LOGO_URL = logo_data_url()
+    return _LOGO_URL
 
 
 def render_header(title: str, round_num: int, station: str,
@@ -9,13 +20,18 @@ def render_header(title: str, round_num: int, station: str,
     if english_mode:
         en = ENGLISH_STATION_NAMES.get(station, {"name": c['name'], "emoji": c['emoji']})
         station_name = en['name']
-        station_emoji = en['emoji']
         lbl = ENGLISH_LABELS
         round_label = f"{lbl['round']} {round_num}"
     else:
         station_name = c['name']
-        station_emoji = c['emoji']
-        round_label = f"\u05e1\u05d1\u05d1 {round_num}"
+        round_label = f"סבב {round_num}"
+
+    svg_icon = STATION_ICONS.get(station, "")
+    logo_url = _get_logo()
+    logo_img = (
+        f'<img src="{logo_url}" class="header-logo-img" alt="אל השדה">'
+        if logo_url else '<div style="width:52px;"></div>'
+    )
 
     student_bar = ""
     if include_student_bar:
@@ -30,21 +46,20 @@ def render_header(title: str, round_num: int, station: str,
         else:
             student_bar = """
             <div class="student-bar">
-                <div class="student-field"><label>\u05e9\u05dd:</label><div class="student-line"></div></div>
-                <div class="student-field"><label>\u05db\u05d9\u05ea\u05d4:</label><div class="student-line"></div></div>
-                <div class="student-field"><label>\u05ea\u05d0\u05e8\u05d9\u05da:</label><div class="student-line"></div></div>
+                <div class="student-field"><label>שם:</label><div class="student-line"></div></div>
+                <div class="student-field"><label>כיתה:</label><div class="student-line"></div></div>
+                <div class="student-field"><label>תאריך:</label><div class="student-line"></div></div>
             </div>
             """
+
     return f"""
     <div class="page-header">
-        <div class="header-left">
-            <div class="header-icon">{station_emoji}</div>
-            <div>
-                <div class="header-title">{station_name}</div>
-                <div class="header-subtitle">{title}</div>
-            </div>
+        <div class="header-icon-circle">{svg_icon}</div>
+        <div class="header-center">
+            <div class="header-round-badge">{round_label}</div>
+            <div class="header-station-name">{station_name}</div>
         </div>
-        <div class="header-badge">{round_label}</div>
+        {logo_img}
     </div>
     {student_bar}
     """
