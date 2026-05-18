@@ -117,17 +117,25 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
 
     # Topic image float (right side in RTL = float:left in CSS)
     image_html = ""
+    bottom_image_html = ""
     if topic_image:
         try:
             from ..images import ImageService
             data_url = ImageService.to_data_url(topic_image)
             c = STATION_COLORS['comprehension']
             image_html = f"""
-            <div style="float:left; margin:0 0 12px 16px; clear:left;">
+            <div style="float:left; margin:0 0 14px 20px; clear:left;">
                 <img src="{data_url}"
-                     style="width:160px; height:110px; object-fit:cover;
-                            border-radius:10px; border:3px solid {c['border']};
-                            box-shadow:0 3px 8px rgba(0,0,0,0.18); display:block;" alt="">
+                     style="width:230px; height:160px; object-fit:cover;
+                            border-radius:12px; border:3px solid {c['border']};
+                            box-shadow:0 4px 10px rgba(0,0,0,0.22); display:block;" alt="">
+            </div>"""
+            bottom_image_html = f"""
+            <div style="clear:both; margin-top:18px; text-align:center;">
+                <img src="{data_url}"
+                     style="width:90%; max-height:190px; object-fit:cover;
+                            border-radius:12px; border:3px solid {c['border']};
+                            box-shadow:0 4px 12px rgba(0,0,0,0.20);" alt="">
             </div>"""
         except Exception:
             pass
@@ -142,7 +150,7 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
 <div class="instruction-box">{reading_instruction}</div>
 {kwl_html}
 <div style="background:#fafafa; border:1px solid #ddd; border-radius:10px; padding:18px 22px;">
-    <div style="font-size:22px; font-weight:800; color:#c0392b; text-align:center; margin-bottom:6px;">{data.get('section_title', '')}</div>
+    <div style="font-size:26px; font-weight:800; color:#c0392b; text-align:center; margin-bottom:6px;">{data.get('section_title', '')}</div>
     <div style="font-size:14px; font-style:italic; text-align:center; color:#555; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:14px;">{data.get('intro_sentence') or data.get('intro_question', '')}</div>
     {paras_html}
     <div style="background:#fadbd8; border:1.5px solid #e74c3c; border-radius:6px; padding:8px 12px; margin-top:12px; font-size:12px;">
@@ -151,5 +159,6 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
 </div>
 {written_response_html}
 {disc_box}
+{bottom_image_html}
 <div class="page-footer">{footer_text}</div>
 </body></html>"""

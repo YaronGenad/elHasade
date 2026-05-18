@@ -1,4 +1,6 @@
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List
 
 import structlog
@@ -394,7 +396,6 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
 def generate_all_rounds(user_input: Dict[str, Any], roadmap: Dict[str, Any], output_dir: str = "output") -> Dict[str, Any]:
     total = user_input.get('rounds', DEFAULT_ROUNDS)
     all_results = []
-    prev_texts = []
     all_student_files = []
     all_teacher_files = []
     total_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
@@ -404,37 +405,49 @@ def generate_all_rounds(user_input: Dict[str, Any], roadmap: Dict[str, Any], out
     for k in total_usage:
         total_usage[k] += roadmap_usage.get(k, 0)
 
-    accumulated_cost_usd: float = (
-        roadmap_usage.get("input_tokens", 0) * GEMINI_FLASH_INPUT_COST_PER_1M / 1_000_000
-        + roadmap_usage.get("output_tokens", 0) * GEMINI_FLASH_OUTPUT_COST_PER_1M / 1_000_000
-    )
+    failed_rounds: List[int] = []
+    results_by_round: Dict[int, Any] = {}
+    cancel_event = threading.Event()
 
-    # Pass running cost into each round via user_input copy
-    round_input = dict(user_input)
+    def _run_round(round_num: int) -> Any:
+        if cancel_event.is_set():
+            return None
+        inp = dict(user_input)
+        inp['_accumulated_cost_usd'] = 0.0  # each round tracks its own cost vs per-round limit
+        return generate_round(inp, roadmap, round_num, output_dir, prev_texts=[])
 
-    failed_rounds = []
+    workers = min(total, 4)
+    log.info("parallel_rounds_start", total=total, workers=workers)
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_map = {executor.submit(_run_round, i): i for i in range(1, total + 1)}
+        for future in as_completed(future_map):
+            rn = future_map[future]
+            try:
+                result = future.result()
+                if result is None:
+                    continue  # cancelled
+                results_by_round[rn] = result
+            except CostLimitExceededError as exc:
+                cancel_event.set()
+                log.error("round_failed", round=rn, total=total, error=str(exc),
+                          error_type=type(exc).__name__, exc_info=True)
+                failed_rounds.append(rn)
+                all_results.append({"error": str(exc), "round": rn})
+            except Exception as exc:
+                log.error("round_failed", round=rn, total=total, error=str(exc),
+                          error_type=type(exc).__name__, exc_info=True)
+                failed_rounds.append(rn)
+                all_results.append({"error": str(exc), "round": rn})
+
+    # Collect results in round order for consistent PDF page ordering
     for i in range(1, total + 1):
-        round_input['_accumulated_cost_usd'] = accumulated_cost_usd
-        try:
-            result = generate_round(round_input, roadmap, i, output_dir, prev_texts)
-        except CostLimitExceededError as exc:
-            log.error("round_failed", round=i, total=total, error=str(exc),
-                      error_type=type(exc).__name__, exc_info=True)
-            failed_rounds.append(i)
-            all_results.append({"error": str(exc), "round": i})
-            break
-        except Exception as exc:
-            log.error("round_failed", round=i, total=total, error=str(exc),
-                      error_type=type(exc).__name__, exc_info=True)
-            failed_rounds.append(i)
-            all_results.append({"error": str(exc), "round": i})
+        if i not in results_by_round:
             continue
-        prev_texts = result.get('prev_texts', prev_texts)
-        accumulated_cost_usd = result.get('_accumulated_cost_usd', accumulated_cost_usd)
+        result = results_by_round[i]
+        all_results.append(result)
         round_usage = result.get('usage', {})
         for k in total_usage:
             total_usage[k] += round_usage.get(k, 0)
-        all_results.append(result)
         files = result.get('files', {})
         all_student_files.extend([
             files.get('comprehension', ''), files.get('methods', ''),

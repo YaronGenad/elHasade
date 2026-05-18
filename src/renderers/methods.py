@@ -97,11 +97,11 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
             data_url = ImageService.to_data_url(topic_image)
             c = STATION_COLORS['methods']
             image_html = f"""
-            <div style="float:left; margin:0 0 12px 16px; clear:left;">
+            <div style="float:left; margin:0 0 14px 18px; clear:left;">
                 <img src="{data_url}"
-                     style="width:150px; height:100px; object-fit:cover;
-                            border-radius:10px; border:3px solid {c['border']};
-                            box-shadow:0 3px 8px rgba(0,0,0,0.18); display:block;" alt="">
+                     style="width:210px; height:145px; object-fit:cover;
+                            border-radius:12px; border:3px solid {c['border']};
+                            box-shadow:0 4px 10px rgba(0,0,0,0.22); display:block;" alt="">
             </div>"""
         except Exception:
             pass

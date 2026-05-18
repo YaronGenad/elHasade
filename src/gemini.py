@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import time
 from typing import Any, Dict, Tuple
 
@@ -11,26 +12,46 @@ from .config import (
     GEMINI_MAX_RETRIES,
     GEMINI_MAX_OUTPUT_TOKENS,
     GEMINI_MODEL,
+    GEMINI_MODEL_FALLBACK_CHAIN,
     GEMINI_RATE_LIMIT_BACKOFF_BASE,
 )
 
 log = structlog.get_logger(__name__)
 
-_gemini_client: genai.Client | None = None
-_call_sequence: int = 0  # global counter across all calls in this process
+_client_k1: genai.Client | None = None
+_client_k2: genai.Client | None = None
+_client_lock = threading.Lock()
+
+_call_sequence: int = 0
+_seq_lock = threading.Lock()
 
 # Zero-usage sentinel returned when metadata is absent
 _ZERO_USAGE: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
 
 
-def _get_gemini_client() -> genai.Client:
-    global _gemini_client
-    if _gemini_client is None:
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY not found. Check your .env file.")
-        _gemini_client = genai.Client(api_key=api_key)
-    return _gemini_client
+def _next_seq() -> int:
+    global _call_sequence
+    with _seq_lock:
+        _call_sequence += 1
+        return _call_sequence
+
+
+def _get_gemini_client(seq: int) -> genai.Client:
+    global _client_k1, _client_k2
+    key1 = os.environ.get("GEMINI_API_KEY")
+    key2 = os.environ.get("GEMINI_API_KEY_2")
+    if not key1:
+        raise ValueError("GEMINI_API_KEY not found. Check your .env file.")
+    use_key2 = bool(key2) and (seq % 2 == 1)
+    with _client_lock:
+        if use_key2:
+            if _client_k2 is None:
+                _client_k2 = genai.Client(api_key=key2)
+            return _client_k2
+        else:
+            if _client_k1 is None:
+                _client_k1 = genai.Client(api_key=key1)
+            return _client_k1
 
 
 def _extract_usage(response: Any) -> Dict[str, int]:
@@ -63,6 +84,7 @@ def _parse_json(text: str) -> Dict[str, Any]:
 def _call_anthropic(
     prompt: str, max_retries: int = GEMINI_MAX_RETRIES, seq: int = 0
 ) -> Tuple[Dict[str, Any], Dict[str, int]]:
+    """Kept for reference; not called in normal operation."""
     import anthropic
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -128,89 +150,127 @@ def _call_anthropic(
     raise Exception(f"Failed after {max_retries} retries (seq={seq})")
 
 
+def _is_daily_quota_error(err_str: str) -> bool:
+    """True when the model's quota is exhausted and retrying won't help.
+    Catches both daily-limit messages and the generic free-tier exhaustion message."""
+    lower = err_str.lower()
+    has_rpm_signal = "per_minute" in lower or "rate limit" in lower or "per minute" in lower
+    return (
+        "PerDay" in err_str
+        or "per_day" in lower
+        or "GenerateRequestsPerDay" in err_str
+        or "daily" in lower
+        or "exceeded your current quota" in lower
+        or "check your plan and billing" in lower
+        or (("RESOURCE_EXHAUSTED" in err_str or "resource_exhausted" in lower) and not has_rpm_signal)
+    )
+
+
 def _call_gemini(
     prompt: str, max_retries: int = GEMINI_MAX_RETRIES
 ) -> Tuple[Dict[str, Any], Dict[str, int]]:
-    global _call_sequence
-    _call_sequence += 1
-    seq = _call_sequence
-
-    # Use Anthropic if key is present — bypasses all Gemini quota issues
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return _call_anthropic(prompt, max_retries, seq)
-
-    client = _get_gemini_client()
-    # Disable thinking tokens: gemini-3-flash-preview is a thinking model that spends
-    # ~4000 tokens on internal reasoning, leaving almost nothing for JSON output.
+    seq = _next_seq()
+    client = _get_gemini_client(seq)
+    # Disable thinking tokens: flash models consume output budget on internal reasoning;
+    # we need all output tokens for JSON.
     config = types.GenerateContentConfig(
         max_output_tokens=GEMINI_MAX_OUTPUT_TOKENS,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
     )
 
-    for attempt in range(max_retries):
-        log.info(
-            "gemini_request",
-            seq=seq,
-            attempt=attempt + 1,
-            max_retries=max_retries,
-            model=GEMINI_MODEL,
-            prompt_chars=len(prompt),
-        )
-        try:
-            response = client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=prompt,
-                config=config,
-            )
-            usage = _extract_usage(response)
+    models = list(GEMINI_MODEL_FALLBACK_CHAIN)
+    last_exc: Exception = Exception(f"No models available (seq={seq})")
+
+    for model in models:
+        quota_exhausted = False
+        for attempt in range(max_retries):
             log.info(
-                "gemini_response_ok",
-                seq=seq,
-                attempt=attempt + 1,
-                input_tokens=usage["input_tokens"],
-                output_tokens=usage["output_tokens"],
-                cached_tokens=usage["cached_tokens"],
-            )
-
-            text = response.text.strip()
-            return _parse_json(text), usage
-
-        except json.JSONDecodeError as e:
-            log.warning(
-                "gemini_json_parse_error",
+                "gemini_request",
                 seq=seq,
                 attempt=attempt + 1,
                 max_retries=max_retries,
-                error=str(e),
-                response_tail=text[-300:] if len(text) > 300 else text,
+                model=model,
+                key_slot=1 + (seq % 2),
+                prompt_chars=len(prompt),
             )
-            if attempt == max_retries - 1:
-                raise
-        except Exception as e:
-            err_str = str(e)
-            if "429" in err_str or "quota" in err_str.lower() or "RESOURCE_EXHAUSTED" in err_str:
-                wait = GEMINI_RATE_LIMIT_BACKOFF_BASE * (attempt + 1)
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=config,
+                )
+                usage = _extract_usage(response)
+                log.info(
+                    "gemini_response_ok",
+                    seq=seq,
+                    attempt=attempt + 1,
+                    model=model,
+                    input_tokens=usage["input_tokens"],
+                    output_tokens=usage["output_tokens"],
+                    cached_tokens=usage["cached_tokens"],
+                )
+                text = response.text.strip()
+                return _parse_json(text), usage
+
+            except json.JSONDecodeError as e:
+                text_val = locals().get("text", "")
                 log.warning(
-                    "gemini_rate_limit",
+                    "gemini_json_parse_error",
                     seq=seq,
                     attempt=attempt + 1,
-                    wait_seconds=wait,
-                    error=err_str,
+                    model=model,
+                    error=str(e),
+                    response_tail=text_val[-300:] if len(text_val) > 300 else text_val,
                 )
-                time.sleep(wait)
-            else:
-                log.error(
-                    "gemini_api_error",
-                    seq=seq,
-                    attempt=attempt + 1,
-                    max_retries=max_retries,
-                    error_type=type(e).__name__,
-                    error=err_str,
-                )
+                last_exc = e
                 if attempt == max_retries - 1:
                     raise
 
-    raise Exception(f"Failed after {max_retries} retries (seq={seq})")
+            except Exception as e:
+                err_str = str(e)
+                last_exc = e
+                is_quota = "429" in err_str or "quota" in err_str.lower() or "RESOURCE_EXHAUSTED" in err_str
+
+                if is_quota:
+                    if _is_daily_quota_error(err_str):
+                        # Daily limit — no point retrying; try next model immediately
+                        log.warning(
+                            "gemini_daily_quota_exhausted",
+                            seq=seq,
+                            model=model,
+                            next_model=models[models.index(model) + 1] if model != models[-1] else "none",
+                            error=err_str[:300],
+                        )
+                        quota_exhausted = True
+                        break  # exit attempt loop → move to next model
+                    else:
+                        # Per-minute rate limit — wait and retry same model
+                        wait = GEMINI_RATE_LIMIT_BACKOFF_BASE * (attempt + 1)
+                        log.warning(
+                            "gemini_rate_limit",
+                            seq=seq,
+                            attempt=attempt + 1,
+                            model=model,
+                            wait_seconds=wait,
+                            error=err_str[:300],
+                        )
+                        time.sleep(wait)
+                else:
+                    log.error(
+                        "gemini_api_error",
+                        seq=seq,
+                        attempt=attempt + 1,
+                        model=model,
+                        error_type=type(e).__name__,
+                        error=err_str[:300],
+                    )
+                    if attempt == max_retries - 1:
+                        raise
+
+        if quota_exhausted:
+            continue  # try next model in chain
+
+    raise last_exc
 
 
 def call_gemini(

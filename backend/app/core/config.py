@@ -18,7 +18,11 @@ class Settings(BaseSettings):
 
     # LLM Providers
     GEMINI_API_KEY: str = Field(default="", env="GEMINI_API_KEY")
+    GEMINI_API_KEY_2: str = Field(default="", env="GEMINI_API_KEY_2")
     ANTHROPIC_API_KEY: str = Field(default="", env="ANTHROPIC_API_KEY")
+
+    # Image providers
+    PEXELS_API_KEY: str = Field(default="", env="PEXELS_API_KEY")
 
     # File Storage
     UPLOAD_DIR: str = Field(default="./uploads", env="UPLOAD_DIR")

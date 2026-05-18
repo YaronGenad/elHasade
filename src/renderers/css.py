@@ -48,7 +48,7 @@ ENGLISH_LABELS = {
 def get_css(station: str = "comprehension") -> str:
     c = STATION_COLORS[station]
     return f"""
-    @page {{ size: A4; margin: 5mm; }}
+    @page {{ size: A4; margin: 0; }}
     * {{ box-sizing: border-box; }}
     body {{
         font-family: Arial, 'Arial Hebrew', sans-serif;
@@ -58,31 +58,37 @@ def get_css(station: str = "comprehension") -> str:
         background: white;
         font-size: 13px;
         margin: 0;
-        padding: 0 14px 14px;
-        border: 5px solid {c['primary']};
-        border-radius: 10px;
-        min-height: calc(297mm - 10mm - 10px);
+        padding: 0 10mm 18mm;
+    }}
+    /* Fixed colored border — repeats on EVERY PDF page via position:fixed */
+    .page-frame-border {{
+        position: fixed;
+        top: 4mm; left: 4mm; right: 4mm; bottom: 4mm;
+        border: 14px solid {c['primary']};
+        border-radius: 12px;
+        pointer-events: none;
+        z-index: 100;
     }}
     .page-header {{
         background: linear-gradient(135deg, {c['primary']}, {c['border']});
         color: white;
-        padding: 10px 14px;
-        border-radius: 8px 8px 0 0;
-        margin: 0 -14px 16px;
+        padding: 14px 18px;
+        border-radius: 0;
+        margin: 0 -10mm 16px;
         direction: ltr;
         display: flex;
         flex-direction: row;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
     }}
     .header-icon-circle {{
-        width: 52px; height: 52px;
+        width: 64px; height: 64px;
         background: rgba(255,255,255,0.22);
         border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         flex-shrink: 0;
     }}
-    .header-icon-circle svg {{ width: 30px; height: 30px; display: block; }}
+    .header-icon-circle svg {{ width: 36px; height: 36px; display: block; }}
     .header-center {{
         flex: 1;
         text-align: center;
@@ -93,26 +99,26 @@ def get_css(station: str = "comprehension") -> str:
         background: rgba(255,255,255,0.25);
         border: 1.5px solid rgba(255,255,255,0.6);
         border-radius: 20px;
-        padding: 2px 14px;
-        font-size: 12px;
+        padding: 3px 16px;
+        font-size: 13px;
         font-weight: 700;
         color: white;
-        margin-bottom: 3px;
+        margin-bottom: 4px;
     }}
     .header-station-name {{
-        font-size: 18px;
+        font-size: 22px;
         font-weight: 800;
         color: white;
     }}
     .header-logo-img {{
-        width: 52px; height: 52px;
+        width: 64px; height: 64px;
         border-radius: 50%;
         object-fit: cover;
         flex-shrink: 0;
         border: 2px solid rgba(255,255,255,0.4);
     }}
     /* legacy classes kept for backward compat */
-    .header-left {{ display: flex; align-items: center; gap: 10px; }}
+    .header-left {{ display: flex; align-items: center; gap: 12px; }}
     .header-icon {{
         width: 44px; height: 44px;
         background: rgba(255,255,255,0.25);
@@ -306,9 +312,18 @@ def get_css(station: str = "comprehension") -> str:
     .tl-yellow {{ background: #fef9e7; border: 1.5px solid #f1c40f; border-radius: 6px; padding: 6px 10px; font-size: 12px; flex: 1; }}
     .tl-red {{ background: #fadbd8; border: 1.5px solid #e74c3c; border-radius: 6px; padding: 6px 10px; font-size: 12px; flex: 1; }}
     .tl-label {{ font-size: 10px; font-weight: 700; margin-bottom: 3px; }}
+    /* Fixed footer — repeats on EVERY PDF page via position:fixed */
     .page-footer {{
-        text-align: center; font-size: 10px; color: #aaa;
-        border-top: 1px solid #eee; padding-top: 6px; margin-top: 20px;
+        position: fixed;
+        bottom: 7mm;
+        left: 10mm; right: 10mm;
+        text-align: center;
+        font-size: 10px;
+        color: #aaa;
+        border-top: 1px solid #eee;
+        padding-top: 5px;
+        background: white;
+        z-index: 200;
     }}
     .page-break {{ page-break-before: always; }}
     .physical-badge {{

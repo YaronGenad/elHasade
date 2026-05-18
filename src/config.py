@@ -3,7 +3,16 @@ from typing import Any, Dict
 
 
 # ─── LLM Configuration ─────────────────────────────────────────────────────────
-GEMINI_MODEL: str = "gemini-2.5-flash"
+GEMINI_MODEL: str = "gemini-3-flash-preview"
+
+# Fallback chain — tried in order only when the current model hits a quota/daily-limit error.
+# RPM rate-limits (temporary) still retry the same model with backoff.
+GEMINI_MODEL_FALLBACK_CHAIN: list = [
+    "gemini-3-flash-preview",    # primary
+    "gemini-3.1-flash-lite",     # fallback 1: lighter quota pressure
+    "gemini-2.5-flash",          # fallback 2: high free-tier quota (1500 req/day)
+]
+
 GEMINI_MAX_RETRIES: int = 3
 GEMINI_RATE_LIMIT_BACKOFF_BASE: int = 20  # seconds, multiplied by (attempt + 1)
 

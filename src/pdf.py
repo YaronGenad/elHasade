@@ -168,12 +168,19 @@ def _html_to_pdf(page: Any, html_content: str, output_path: str) -> None:
     """Render HTML string to PDF using an already-open Playwright page."""
     try:
         page.set_content(html_content, wait_until="domcontentloaded")
+        # Inject the fixed-position frame border for station pages.
+        # position:fixed repeats on every PDF page in Playwright — this gives
+        # a consistent colored border on ALL pages without modifying every renderer.
+        if "page-frame-border" not in html_content and "page-header" in html_content:
+            page.evaluate(
+                "document.body.insertAdjacentHTML('afterbegin',"
+                "'<div class=\"page-frame-border\"></div>');"
+            )
         page.wait_for_timeout(300)
         page.pdf(
             path=output_path,
             format="A4",
-            margin={"top": "1.4cm", "bottom": "1.4cm",
-                    "left": "1.6cm", "right": "1.6cm"},
+            margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
             print_background=True,
         )
     except Exception as exc:
