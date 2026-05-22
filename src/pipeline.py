@@ -164,13 +164,19 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     if not english_mode:
         _img = ImageService()
         topic_images = {
-            "comprehension": _img.fetch(topic, grade, "comprehension"),
-            "methods":       _img.fetch(topic, grade, "methods"),
-            "precision":     _img.fetch(topic, grade, "precision"),
+            "comprehension": _img.fetch(topic, grade, "comprehension", round_num),
+            "methods":       _img.fetch(topic, grade, "methods", round_num),
+            "precision":     _img.fetch(topic, grade, "precision", round_num),
         }
-        log.info("images_fetched", cached=[k for k, v in topic_images.items() if v])
+        decorative_images = {
+            "precision":   _img.fetch_decorative(topic, "precision", round_num),
+            "vocabulary":  _img.fetch_decorative(topic, "vocabulary", round_num),
+        }
+        log.info("images_fetched", cached=[k for k, v in topic_images.items() if v],
+                 decorative=[k for k, v in decorative_images.items() if v])
     else:
         topic_images = {"comprehension": None, "methods": None, "precision": None}
+        decorative_images = {"precision": None, "vocabulary": None}
 
     # Accumulated cost so far across this generation (passed in from caller)
     accumulated_cost_usd: float = user_input.get('_accumulated_cost_usd', 0.0)
@@ -310,7 +316,8 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_complete", station="precision", dictation_words=len(prec_data.get('dictation_list', [])), exercises=len(prec_data.get('exercises', [])))
     content['precision'] = prec_data
     prec_html = _render("precision", render_precision, topic, round_num, prec_data,
-                        english_mode=english_mode, topic_image=topic_images["precision"])
+                        english_mode=english_mode, topic_image=topic_images["precision"],
+                        decorative_image=decorative_images.get("precision"))
     prec_path = f"{output_dir}/{safe_name}_round{round_num}_precision.html"
     _save(prec_html, prec_path, "precision")
     files['precision'] = prec_path
@@ -337,7 +344,8 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_complete", station="vocabulary", activity_type=vocab_data.get('activity_type', ''), title=vocab_data.get('title', ''))
     content['vocabulary'] = vocab_data
     vocab_html = _render("vocabulary", render_vocabulary, topic, round_num, vocab_data,
-                         english_mode=english_mode)
+                         english_mode=english_mode,
+                         decorative_image=decorative_images.get("vocabulary"))
     vocab_path = f"{output_dir}/{safe_name}_round{round_num}_vocabulary.html"
     _save(vocab_html, vocab_path, "vocabulary")
     files['vocabulary'] = vocab_path

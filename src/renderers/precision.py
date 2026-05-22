@@ -5,10 +5,12 @@ from .header import render_header
 
 
 def render_precision(title: str, round_num: int, data: Dict, english_mode: bool = False,
-                     topic_image: Optional[str] = None) -> str:
+                     topic_image: Optional[str] = None,
+                     decorative_image: Optional[str] = None) -> str:
     # ── STEAM HANDS-ON branch ──────────────────────────────────────
     if data.get('is_hands_on'):
-        return _render_stem_precision(title, round_num, data, topic_image=topic_image)
+        return _render_stem_precision(title, round_num, data, topic_image=topic_image,
+                                      decorative_image=decorative_image)
 
     # ── Language / English grammar branch ─────────────────────────
     if english_mode:
@@ -111,6 +113,20 @@ def render_precision(title: str, round_num: int, data: Dict, english_mode: bool 
         except Exception:
             pass
 
+    decorative_html = ""
+    if decorative_image:
+        try:
+            from ..images import ImageService
+            dec_url = ImageService.to_data_url(decorative_image)
+            decorative_html = f"""
+            <div style="clear:both; margin-top:18px; text-align:center;">
+                <img src="{dec_url}"
+                     style="max-width:100%; max-height:130px; object-fit:contain;
+                            border-radius:8px; opacity:0.92;" alt="">
+            </div>"""
+        except Exception:
+            pass
+
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
@@ -122,12 +138,14 @@ def render_precision(title: str, round_num: int, data: Dict, english_mode: bool 
 {dictation_html}
 {exercises_html}
 {sent_html}
+{decorative_html}
 <div class="page-footer">{footer_text}</div>
 </body></html>"""
 
 
 def _render_stem_precision(title: str, round_num: int, data: Dict,
-                           topic_image: Optional[str] = None) -> str:
+                           topic_image: Optional[str] = None,
+                           decorative_image: Optional[str] = None) -> str:
     """Renders the STEAM HANDS-ON lab card for the precision station."""
     c = STATION_COLORS['precision']
 
@@ -245,6 +263,20 @@ def _render_stem_precision(title: str, round_num: int, data: Dict,
         except Exception:
             pass
 
+    stem_decorative_html = ""
+    if decorative_image:
+        try:
+            from ..images import ImageService
+            dec_url = ImageService.to_data_url(decorative_image)
+            stem_decorative_html = f"""
+            <div style="clear:both; margin-top:18px; text-align:center;">
+                <img src="{dec_url}"
+                     style="max-width:100%; max-height:130px; object-fit:contain;
+                            border-radius:8px; opacity:0.92;" alt="">
+            </div>"""
+        except Exception:
+            pass
+
     return f"""<!DOCTYPE html>
 <html dir="rtl" lang="he">
 <head><meta charset="UTF-8"><title>תחנת דיוק STEAM - {title} - סבב {round_num}</title>
@@ -264,5 +296,6 @@ def _render_stem_precision(title: str, round_num: int, data: Dict,
 {analysis_html}
 {conc_html}
 {traffic_html}
+{stem_decorative_html}
 <div class="page-footer">א"ל השד"ה STEAM | תחנת דיוק HANDS-ON | {title} | סבב {round_num} — © כל הזכויות שמורות</div>
 </body></html>"""

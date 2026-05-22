@@ -52,6 +52,7 @@ def render_header(title: str, round_num: int, station: str,
             </div>
             """
 
+    title_color = c['primary']
     return f"""
     <div class="page-header">
         <div class="header-icon-circle">{svg_icon}</div>
@@ -61,5 +62,7 @@ def render_header(title: str, round_num: int, station: str,
         </div>
         {logo_img}
     </div>
+    <div style="font-size:24px; font-weight:800; color:{title_color}; text-align:center;
+                margin:10px 0 6px; direction:rtl; line-height:1.3;">{title}</div>
     {student_bar}
     """

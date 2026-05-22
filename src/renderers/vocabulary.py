@@ -1,15 +1,31 @@
 import random
-from typing import Dict
+from typing import Dict, Optional
 from ..config import STATION_COLORS
 from .css import get_css, ENGLISH_LABELS, ENGLISH_STATION_NAMES
 from .header import render_header
 
 
-def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool = False) -> str:
+def _decorative_html(decorative_image: Optional[str]) -> str:
+    if not decorative_image:
+        return ""
+    try:
+        from ..images import ImageService
+        dec_url = ImageService.to_data_url(decorative_image)
+        return (
+            '<div style="clear:both; margin-top:18px; text-align:center;">'
+            f'<img src="{dec_url}" style="max-width:100%; max-height:130px; '
+            'object-fit:contain; border-radius:8px; opacity:0.92;" alt=""></div>'
+        )
+    except Exception:
+        return ""
+
+
+def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool = False,
+                      decorative_image: Optional[str] = None) -> str:
     # ── STEAM bilingual game branch ────────────────────────────────
     activity_type = str(data.get('activity_type') or data.get('game_type') or 'matching_cards')
     if activity_type.startswith('stem_') or data.get('bilingual'):
-        return _render_stem_vocabulary(title, round_num, data)
+        return _render_stem_vocabulary(title, round_num, data, decorative_image=decorative_image)
     # ── Language / English vocabulary branch ──────────────────────
     words = data.get('words', [])
     word_bank = data.get('word_bank', [w.get('word', '') for w in words[:8]])
@@ -254,11 +270,13 @@ def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool
 {render_header(title, round_num, 'vocabulary', english_mode=english_mode)}
 <div class="instruction-box">📌 {data.get('instruction', '')}</div>
 {body_html}
+{_decorative_html(decorative_image)}
 <div class="page-footer">{footer_text}</div>
 </body></html>"""
 
 
-def _render_stem_vocabulary(title: str, round_num: int, data: Dict) -> str:
+def _render_stem_vocabulary(title: str, round_num: int, data: Dict,
+                            decorative_image: Optional[str] = None) -> str:
     """Renders bilingual STEAM vocabulary game cards."""
     c = STATION_COLORS['vocabulary']
     game_type = data.get('game_type') or data.get('activity_type', 'stem_memory')
@@ -352,5 +370,6 @@ def _render_stem_vocabulary(title: str, round_num: int, data: Dict) -> str:
 {mat_html}
 {steps_html}
 {cards_html}
+{_decorative_html(decorative_image)}
 <div class="page-footer">א"ל השד"ה STEAM | תחנת אוצר מילים | {title} | סבב {round_num} — © כל הזכויות שמורות</div>
 </body></html>"""

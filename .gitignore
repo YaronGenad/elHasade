@@ -36,6 +36,15 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
+# Generated PDF artifacts
+*.pdf
+
+# Image cache (runtime downloads)
+cache/
+
+# Source image assets used during development
+GoldFleece-*.jpg
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
@@ -48,9 +57,11 @@ generated_materials/
 # Development planning documents (internal, not part of the codebase)
 plans/
 
-# Markdown docs — only README.md is tracked; everything else is dev process
+# Markdown docs — README, ARCHITECTURE, DEPLOYMENT are tracked; rest are dev process
 *.md
 !README.md
+!ARCHITECTURE.md
+!DEPLOYMENT.md
 
 # Certbot / SSL (populated on first deploy)
 certbot/

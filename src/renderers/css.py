@@ -48,7 +48,7 @@ ENGLISH_LABELS = {
 def get_css(station: str = "comprehension") -> str:
     c = STATION_COLORS[station]
     return f"""
-    @page {{ size: A4; margin: 0; }}
+    @page {{ size: A4; margin: 10mm; }}
     * {{ box-sizing: border-box; }}
     body {{
         font-family: Arial, 'Arial Hebrew', sans-serif;
@@ -58,14 +58,14 @@ def get_css(station: str = "comprehension") -> str:
         background: white;
         font-size: 13px;
         margin: 0;
-        padding: 0 10mm 18mm;
+        padding: 0 0 4mm;
     }}
-    /* Fixed colored border — repeats on EVERY PDF page via position:fixed */
+    /* Fixed colored border — sits at paper edge, @page margin keeps content inside */
     .page-frame-border {{
         position: fixed;
-        top: 4mm; left: 4mm; right: 4mm; bottom: 4mm;
-        border: 14px solid {c['primary']};
-        border-radius: 12px;
+        top: 0; left: 0; right: 0; bottom: 0;
+        border: 10mm solid {c['primary']};
+        border-radius: 4mm;
         pointer-events: none;
         z-index: 100;
     }}
@@ -74,7 +74,7 @@ def get_css(station: str = "comprehension") -> str:
         color: white;
         padding: 14px 18px;
         border-radius: 0;
-        margin: 0 -10mm 16px;
+        margin: 0 0 16px;
         direction: ltr;
         display: flex;
         flex-direction: row;
@@ -312,17 +312,16 @@ def get_css(station: str = "comprehension") -> str:
     .tl-yellow {{ background: #fef9e7; border: 1.5px solid #f1c40f; border-radius: 6px; padding: 6px 10px; font-size: 12px; flex: 1; }}
     .tl-red {{ background: #fadbd8; border: 1.5px solid #e74c3c; border-radius: 6px; padding: 6px 10px; font-size: 12px; flex: 1; }}
     .tl-label {{ font-size: 10px; font-weight: 700; margin-bottom: 3px; }}
-    /* Fixed footer — repeats on EVERY PDF page via position:fixed */
+    /* Fixed footer — sits within the @page margin area at paper bottom */
     .page-footer {{
         position: fixed;
-        bottom: 7mm;
-        left: 10mm; right: 10mm;
+        bottom: 2mm;
+        left: 0; right: 0;
         text-align: center;
         font-size: 10px;
-        color: #aaa;
-        border-top: 1px solid #eee;
-        padding-top: 5px;
-        background: white;
+        color: #888;
+        padding-top: 4px;
+        background: transparent;
         z-index: 200;
     }}
     .page-break {{ page-break-before: always; }}

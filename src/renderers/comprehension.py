@@ -117,7 +117,6 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
 
     # Topic image float (right side in RTL = float:left in CSS)
     image_html = ""
-    bottom_image_html = ""
     if topic_image:
         try:
             from ..images import ImageService
@@ -130,13 +129,6 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
                             border-radius:12px; border:3px solid {c['border']};
                             box-shadow:0 4px 10px rgba(0,0,0,0.22); display:block;" alt="">
             </div>"""
-            bottom_image_html = f"""
-            <div style="clear:both; margin-top:18px; text-align:center;">
-                <img src="{data_url}"
-                     style="width:90%; max-height:190px; object-fit:cover;
-                            border-radius:12px; border:3px solid {c['border']};
-                            box-shadow:0 4px 12px rgba(0,0,0,0.20);" alt="">
-            </div>"""
         except Exception:
             pass
 
@@ -146,8 +138,8 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
 <style>{get_css('comprehension')}</style></head>
 <body>
 {render_header(title, round_num, 'comprehension', english_mode=english_mode)}
-{image_html}
 <div class="instruction-box">{reading_instruction}</div>
+{image_html}
 {kwl_html}
 <div style="background:#fafafa; border:1px solid #ddd; border-radius:10px; padding:18px 22px;">
     <div style="font-size:26px; font-weight:800; color:#c0392b; text-align:center; margin-bottom:6px;">{data.get('section_title', '')}</div>
@@ -159,6 +151,5 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
 </div>
 {written_response_html}
 {disc_box}
-{bottom_image_html}
 <div class="page-footer">{footer_text}</div>
 </body></html>"""
