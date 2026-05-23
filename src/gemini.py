@@ -118,9 +118,17 @@ def _call_gemini(
     seq = _next_seq()
     # Disable thinking tokens: flash models consume output budget on internal reasoning;
     # we need all output tokens for JSON.
+    # thinking_budget was added in google-genai ~1.7; guard against older versions.
+    try:
+        _thinking_cfg = types.ThinkingConfig(thinking_budget=0)
+    except Exception:
+        try:
+            _thinking_cfg = types.ThinkingConfig()
+        except Exception:
+            _thinking_cfg = None
     config = types.GenerateContentConfig(
         max_output_tokens=GEMINI_MAX_OUTPUT_TOKENS,
-        thinking_config=types.ThinkingConfig(thinking_budget=0),
+        **({'thinking_config': _thinking_cfg} if _thinking_cfg is not None else {}),
     )
 
     models = list(GEMINI_MODEL_FALLBACK_CHAIN)
@@ -372,12 +380,17 @@ def call_gemini(
     prompt: str, max_retries: int = GEMINI_MAX_RETRIES
 ) -> Tuple[Dict[str, Any], Dict[str, int]]:
     """Try Gemini (all keys, round-robin) → OpenAI → Anthropic."""
+    # Python 3 deletes `except X as var` after the block — save to plain vars.
+    gemini_err: Exception = Exception("gemini not attempted")
+    openai_err: Exception = Exception("openai not attempted")
+
     try:
         return _call_gemini(prompt, max_retries)
-    except Exception as gemini_exc:
+    except Exception as e:
+        gemini_err = e
         log.warning(
             "gemini_all_keys_failed",
-            error=str(gemini_exc)[:300],
+            error=str(e)[:300],
             trying_fallback="openai",
         )
 
@@ -385,10 +398,11 @@ def call_gemini(
         result, usage = _call_openai(prompt)
         log.info("openai_fallback_success")
         return result, usage
-    except Exception as openai_exc:
+    except Exception as e:
+        openai_err = e
         log.warning(
             "openai_fallback_failed",
-            error=str(openai_exc)[:300],
+            error=str(e)[:300],
             trying_fallback="anthropic",
         )
 
@@ -396,16 +410,15 @@ def call_gemini(
         result, usage = _call_anthropic(prompt)
         log.info("anthropic_fallback_success")
         return result, usage
-    except Exception as anthropic_exc:
+    except Exception as e:
         log.error(
             "all_providers_failed",
-            gemini=str(gemini_exc)[:200],
-            openai=str(openai_exc)[:200],
-            anthropic=str(anthropic_exc)[:200],
+            gemini=str(gemini_err)[:200],
+            openai=str(openai_err)[:200],
+            anthropic=str(e)[:200],
         )
-        # Import here to avoid circular dependency at module load time
         from .exceptions import LLMAPIError
         raise LLMAPIError(
             message="All LLM providers failed",
-            detail=f"Gemini: {gemini_exc} | OpenAI: {openai_exc} | Anthropic: {anthropic_exc}",
-        ) from anthropic_exc
+            detail=f"Gemini: {gemini_err} | OpenAI: {openai_err} | Anthropic: {e}",
+        ) from e
