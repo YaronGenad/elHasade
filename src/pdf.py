@@ -241,31 +241,35 @@ def make_pdf_isolated(
         "cover_subtitle": cover_subtitle,
         "subject": subject,
         "grade": grade,
-    })
+    }).encode()
+    proc = subprocess.Popen(
+        [sys.executable, "-c", _MAKE_PDF_SUBPROCESS_SCRIPT, _PROJECT_ROOT],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={**os.environ},
+    )
     try:
-        result = subprocess.run(
-            [sys.executable, "-c", _MAKE_PDF_SUBPROCESS_SCRIPT, _PROJECT_ROOT],
-            input=payload,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            env={**os.environ},
-        )
-        if result.returncode != 0:
-            log.error(
-                "make_pdf_subprocess_failed",
-                output_path=output_path,
-                returncode=result.returncode,
-                stderr=result.stderr[:800],
-            )
-            return False
-        return True
+        stdout, stderr = proc.communicate(input=payload, timeout=180)
     except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()  # drain pipes so the child process fully terminates
         log.error("make_pdf_subprocess_timeout", output_path=output_path, timeout_seconds=180)
         return False
     except Exception as exc:
+        proc.kill()
+        proc.communicate()
         log.error("make_pdf_subprocess_error", output_path=output_path, error=str(exc))
         return False
+    if proc.returncode != 0:
+        log.error(
+            "make_pdf_subprocess_failed",
+            output_path=output_path,
+            returncode=proc.returncode,
+            stderr=stderr.decode(errors="replace")[:800],
+        )
+        return False
+    return True
 
 
 def make_pdf(html_files: List[str], output_path: str, title: str, cover_subtitle: str = "",

@@ -12,7 +12,8 @@ def _decorative_html(decorative_image: Optional[str]) -> str:
         from ..images import ImageService
         dec_url = ImageService.to_data_url(decorative_image)
         return (
-            '<div style="clear:both; margin-top:18px; text-align:center;">'
+            '<div style="clear:both; margin-top:14px; text-align:center; '
+            'break-before:avoid; page-break-before:avoid; break-inside:avoid;">'
             f'<img src="{dec_url}" style="max-width:100%; max-height:130px; '
             'object-fit:contain; border-radius:8px; opacity:0.92;" alt=""></div>'
         )
@@ -20,12 +21,32 @@ def _decorative_html(decorative_image: Optional[str]) -> str:
         return ""
 
 
+def _extension_html(ext: dict, english_mode: bool = False) -> str:
+    if not ext or not ext.get('items'):
+        return ""
+    title_txt = ext.get('title', 'Extension Activity' if english_mode else 'המשך ואתגר')
+    instruction = ext.get('instruction', '')
+    items_html = "".join([
+        f'<div style="margin-bottom:5px; font-size:12.5px;">{i + 1}. {item}</div>'
+        for i, item in enumerate(ext['items'])
+    ])
+    return f"""
+<div style="margin-top:14px; background:#fef9e7; border:1.5px solid #f1c40f;
+     border-radius:8px; padding:10px 14px;
+     break-before:avoid; page-break-before:avoid; break-inside:avoid;">
+    <div class="section-title">⭐ {title_txt}</div>
+    <div style="font-size:12.5px; margin-bottom:8px; color:#555;">{instruction}</div>
+    {items_html}
+</div>"""
+
+
 def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool = False,
+                      topic_image: Optional[str] = None,
                       decorative_image: Optional[str] = None) -> str:
     # ── STEAM bilingual game branch ────────────────────────────────
     activity_type = str(data.get('activity_type') or data.get('game_type') or 'matching_cards')
     if activity_type.startswith('stem_') or data.get('bilingual'):
-        return _render_stem_vocabulary(title, round_num, data, decorative_image=decorative_image)
+        return _render_stem_vocabulary(title, round_num, data, topic_image=topic_image, decorative_image=decorative_image)
     # ── Language / English vocabulary branch ──────────────────────
     words = data.get('words', [])
     word_bank = data.get('word_bank', [w.get('word', '') for w in words[:8]])
@@ -97,6 +118,21 @@ def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool
         cut_hint = "גזרו את הקלפים לפני הפעילות"
         dominoes_hint = "✂️ גזור את הקלפים וחבר סוף קלף אחד לתחילת הקלף הבא (מושג → הגדרה)"
         list_padding = "padding-right:18px;"
+
+    topic_img_html = ""
+    if topic_image:
+        try:
+            from ..images import ImageService
+            img_url = ImageService.to_data_url(topic_image)
+            float_dir = "right" if english_mode else "left"
+            margin = "0 0 8px 12px" if english_mode else "0 12px 8px 0"
+            topic_img_html = (
+                f'<img src="{img_url}" style="float:{float_dir}; margin:{margin}; '
+                'width:180px; height:120px; object-fit:cover; border-radius:8px; '
+                'border:2px solid #f1c40f;" alt="">'
+            )
+        except Exception:
+            pass
 
     body_html = ""
 
@@ -269,13 +305,16 @@ def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool
 <body>
 {render_header(title, round_num, 'vocabulary', english_mode=english_mode)}
 <div class="instruction-box">📌 {data.get('instruction', '')}</div>
+{topic_img_html}
 {body_html}
 {_decorative_html(decorative_image)}
+{_extension_html(data.get('extension_activity', {}), english_mode=english_mode)}
 <div class="page-footer">{footer_text}</div>
 </body></html>"""
 
 
 def _render_stem_vocabulary(title: str, round_num: int, data: Dict,
+                            topic_image: Optional[str] = None,
                             decorative_image: Optional[str] = None) -> str:
     """Renders bilingual STEAM vocabulary game cards."""
     c = STATION_COLORS['vocabulary']
@@ -354,12 +393,26 @@ def _render_stem_vocabulary(title: str, round_num: int, data: Dict,
         <div class="scissors-hint">✂️ גזור את כל הקלפים, ערבב, וחבר כל מושג לתרגומו/הגדרתו</div>
         """
 
+    stem_topic_img_html = ""
+    if topic_image:
+        try:
+            from ..images import ImageService
+            img_url = ImageService.to_data_url(topic_image)
+            stem_topic_img_html = (
+                f'<img src="{img_url}" style="float:left; margin:0 12px 8px 0; '
+                'width:180px; height:120px; object-fit:cover; border-radius:8px; '
+                'border:2px solid #f1c40f;" alt="">'
+            )
+        except Exception:
+            pass
+
     return f"""<!DOCTYPE html>
 <html dir="rtl" lang="he">
 <head><meta charset="UTF-8"><title>תחנת אוצר מילים STEAM - {title} - סבב {round_num}</title>
 <style>{get_css('vocabulary')}</style></head>
 <body>
 {render_header(title, round_num, 'vocabulary')}
+{stem_topic_img_html}
 <div class="instruction-box">
     <span style="background:{c['primary']}; color:white; padding:3px 10px; border-radius:12px; font-size:12px; margin-left:8px;">{emoji} {game_name}</span>
     📌 {mechanic}
@@ -371,5 +424,6 @@ def _render_stem_vocabulary(title: str, round_num: int, data: Dict,
 {steps_html}
 {cards_html}
 {_decorative_html(decorative_image)}
+{_extension_html(data.get('extension_activity', {}))}
 <div class="page-footer">א"ל השד"ה STEAM | תחנת אוצר מילים | {title} | סבב {round_num} — © כל הזכויות שמורות</div>
 </body></html>"""

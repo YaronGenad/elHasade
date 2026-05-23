@@ -226,7 +226,7 @@ const RoadmapSummary: React.FC<{ result: Record<string, any>; genInfo?: Record<s
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Chip label={`${rnd.round ?? idx + 1}`} size="small" color="primary" sx={{ minWidth: 32 }} />
-                    <Typography fontWeight={500}>סבב {rnd.round ?? idx + 1}</Typography>
+                    <Typography fontWeight={500}>סבב {(rnd.round as number) ?? idx + 1}</Typography>
                   </Box>
                 </AccordionSummary>
                 <AccordionDetails>

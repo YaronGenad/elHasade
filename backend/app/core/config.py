@@ -18,7 +18,10 @@ class Settings(BaseSettings):
 
     # LLM Providers
     GEMINI_API_KEY: str = Field(default="", env="GEMINI_API_KEY")
-    GEMINI_API_KEY_2: str = Field(default="", env="GEMINI_API_KEY_2")
+    GEMINI_API_KEY_2: str = Field(default="", env="GEMINI_API_KEY_BECKUP")
+    GEMINI_API_KEY_3: str = Field(default="", env="GEMINI_API_KEY_BECKUP2")
+    GEMINI_API_KEY_4: str = Field(default="", env="GEMINI_API_KEY_BECKUP3")
+    GPT_API_KEY: str = Field(default="", env="GPT_API_KEY")
     ANTHROPIC_API_KEY: str = Field(default="", env="ANTHROPIC_API_KEY")
 
     # Image providers

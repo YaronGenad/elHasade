@@ -164,19 +164,38 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     if not english_mode:
         _img = ImageService()
         topic_images = {
-            "comprehension": _img.fetch(topic, grade, "comprehension", round_num),
+            "comprehension": None,   # fetched after LLM generates content with story context
             "methods":       _img.fetch(topic, grade, "methods", round_num),
             "precision":     _img.fetch(topic, grade, "precision", round_num),
+            "vocabulary":    _img.fetch(topic, grade, "vocabulary", round_num),
+        }
+        svg_images = {
+            "comprehension": _img.generate_svg_illustration(topic, "comprehension", round_num),
+            "methods":       _img.generate_svg_illustration(topic, "methods", round_num),
+            "precision":     _img.generate_svg_illustration(topic, "precision", round_num),
+            "vocabulary":    _img.generate_svg_illustration(topic, "vocabulary", round_num),
         }
         decorative_images = {
+            "comprehension": _img.fetch_decorative(topic, "comprehension", round_num),
             "precision":   _img.fetch_decorative(topic, "precision", round_num),
             "vocabulary":  _img.fetch_decorative(topic, "vocabulary", round_num),
         }
-        log.info("images_fetched", cached=[k for k, v in topic_images.items() if v],
-                 decorative=[k for k, v in decorative_images.items() if v])
+        # Small decorative SVG rows for filling whitespace in comprehension & methods
+        extra_svgs_map = {
+            "comprehension": _img.generate_mini_svgs(topic, "comprehension", round_num, count=2),
+            "methods":       _img.generate_mini_svgs(topic, "methods", round_num, count=1),
+        }
+
+        log.info("images_fetched",
+                 cached=[k for k, v in topic_images.items() if v],
+                 svg=[k for k, v in svg_images.items() if v],
+                 decorative=[k for k, v in decorative_images.items() if v],
+                 extra_svgs={k: len(v) for k, v in extra_svgs_map.items()})
     else:
-        topic_images = {"comprehension": None, "methods": None, "precision": None}
+        topic_images = {"comprehension": None, "methods": None, "precision": None, "vocabulary": None}
+        svg_images   = {"comprehension": None, "methods": None, "precision": None, "vocabulary": None}
         decorative_images = {"precision": None, "vocabulary": None}
+        extra_svgs_map = {"comprehension": [], "methods": []}
 
     # Accumulated cost so far across this generation (passed in from caller)
     accumulated_cost_usd: float = user_input.get('_accumulated_cost_usd', 0.0)
@@ -264,8 +283,16 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_complete", station="comprehension", words=word_count, paragraphs=len(comp_data.get('paragraphs', [])))
     prev_texts.append(comp_data.get('section_title', '') + ": " + comp_data.get('intro_sentence', ''))
     content['comprehension'] = comp_data
+    if not english_mode:
+        _comp_hint = f"{comp_data.get('section_title', '')} {comp_data.get('intro_sentence', '')}"
+        topic_images["comprehension"] = _img.fetch(topic, grade, "comprehension", round_num, hint=_comp_hint)
+        log.info("comprehension_image_fetched", hint_chars=len(_comp_hint),
+                 found=bool(topic_images["comprehension"]))
     comp_html = _render("comprehension", render_comprehension, topic, round_num, comp_data, grade,
-                        english_mode=english_mode, topic_image=topic_images["comprehension"])
+                        english_mode=english_mode, topic_image=topic_images["comprehension"],
+                        svg_decorative=svg_images.get("comprehension"),
+                        extra_svgs=extra_svgs_map.get("comprehension", []),
+                        decorative_image=decorative_images.get("comprehension"))
     comp_path = f"{output_dir}/{safe_name}_round{round_num}_comprehension.html"
     _save(comp_html, comp_path, "comprehension")
     files['comprehension'] = comp_path
@@ -290,7 +317,9 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_complete", station="methods", writing_type=meth_data.get('writing_type', ''), levels=list(meth_data.get('difficulty_levels', {}).keys()))
     content['methods'] = meth_data
     meth_html = _render("methods", render_methods, topic, round_num, meth_data,
-                        english_mode=english_mode, topic_image=topic_images["methods"])
+                        english_mode=english_mode, topic_image=topic_images["methods"],
+                        svg_decorative=svg_images.get("methods"),
+                        extra_svgs=extra_svgs_map.get("methods", []))
     meth_path = f"{output_dir}/{safe_name}_round{round_num}_methods.html"
     _save(meth_html, meth_path, "methods")
     files['methods'] = meth_path
@@ -317,7 +346,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     content['precision'] = prec_data
     prec_html = _render("precision", render_precision, topic, round_num, prec_data,
                         english_mode=english_mode, topic_image=topic_images["precision"],
-                        decorative_image=decorative_images.get("precision"))
+                        decorative_image=decorative_images.get("precision") or svg_images.get("precision"))
     prec_path = f"{output_dir}/{safe_name}_round{round_num}_precision.html"
     _save(prec_html, prec_path, "precision")
     files['precision'] = prec_path
@@ -345,7 +374,8 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     content['vocabulary'] = vocab_data
     vocab_html = _render("vocabulary", render_vocabulary, topic, round_num, vocab_data,
                          english_mode=english_mode,
-                         decorative_image=decorative_images.get("vocabulary"))
+                         topic_image=topic_images.get("vocabulary"),
+                         decorative_image=decorative_images.get("vocabulary") or svg_images.get("vocabulary"))
     vocab_path = f"{output_dir}/{safe_name}_round{round_num}_vocabulary.html"
     _save(vocab_html, vocab_path, "vocabulary")
     files['vocabulary'] = vocab_path

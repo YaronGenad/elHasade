@@ -90,7 +90,7 @@ def render_precision(title: str, round_num: int, data: Dict, english_mode: bool 
     if data.get('sentences_for_dictation'):
         sents = "".join([f'<li style="margin-bottom:3px;">{s}</li>' for s in data.get('sentences_for_dictation', [])])
         sent_html = f"""
-        <div style="margin-top:14px;">
+        <div style="margin-top:14px; break-inside:avoid; page-break-inside:avoid;">
             <div class="section-title">📝 {sentences_title}</div>
             <ol style="font-size:12.5px; {list_padding} color:#555;">{sents}</ol>
         </div>
@@ -119,7 +119,8 @@ def render_precision(title: str, round_num: int, data: Dict, english_mode: bool 
             from ..images import ImageService
             dec_url = ImageService.to_data_url(decorative_image)
             decorative_html = f"""
-            <div style="clear:both; margin-top:18px; text-align:center;">
+            <div style="clear:both; margin-top:14px; text-align:center;
+                        break-before:avoid; page-break-before:avoid; break-inside:avoid;">
                 <img src="{dec_url}"
                      style="max-width:100%; max-height:130px; object-fit:contain;
                             border-radius:8px; opacity:0.92;" alt="">
@@ -269,7 +270,8 @@ def _render_stem_precision(title: str, round_num: int, data: Dict,
             from ..images import ImageService
             dec_url = ImageService.to_data_url(decorative_image)
             stem_decorative_html = f"""
-            <div style="clear:both; margin-top:18px; text-align:center;">
+            <div style="clear:both; margin-top:14px; text-align:center;
+                        break-before:avoid; page-break-before:avoid; break-inside:avoid;">
                 <img src="{dec_url}"
                      style="max-width:100%; max-height:130px; object-fit:contain;
                             border-radius:8px; opacity:0.92;" alt="">

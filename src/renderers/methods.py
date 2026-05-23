@@ -1,11 +1,76 @@
-from typing import Dict, Optional
+from pathlib import Path
+from typing import Dict, List, Optional
 from ..config import STATION_COLORS
 from .css import get_css, ENGLISH_LABELS
 from .header import render_header
 
 
+def _svg_decorative_html(svg_path: Optional[str]) -> str:
+    if not svg_path:
+        return ""
+    try:
+        svg_content = Path(svg_path).read_text(encoding="utf-8")
+        return (
+            '<div style="clear:both; margin-top:18px; text-align:center; '
+            'break-before:avoid; page-break-before:avoid;">'
+            f'{svg_content}'
+            '</div>'
+        )
+    except Exception:
+        return ""
+
+
+def _svg_row_html(svg_paths: Optional[List[str]]) -> str:
+    """Render a horizontal row of small SVG illustrations to fill whitespace."""
+    if not svg_paths:
+        return ""
+    items = []
+    for path in svg_paths:
+        try:
+            svg_content = Path(path).read_text(encoding="utf-8")
+            items.append(
+                f'<div style="flex:1; max-width:180px; display:flex; '
+                f'align-items:center; justify-content:center;">'
+                f'{svg_content}</div>'
+            )
+        except Exception:
+            continue
+    if not items:
+        return ""
+    return (
+        '<div style="clear:both; display:flex; gap:12px; justify-content:center; '
+        'align-items:center; margin-bottom:10px; '
+        'break-before:avoid; page-break-before:avoid;">'
+        + "".join(items)
+        + '</div>'
+    )
+
+
+def _self_review_html(checklist: list, english_mode: bool = False) -> str:
+    if not checklist:
+        return ""
+    items = "".join([
+        f'<div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:6px; font-size:12.5px;">'
+        f'<span style="font-size:15px; line-height:1;">☐</span>'
+        f'<span>{item}</span></div>'
+        for item in checklist
+    ])
+    title_txt = "Self-Review Checklist — before handing in" if english_mode else "✅ ביקורת עצמית — לפני שמגישים"
+    note_txt = "Check ✓ each item you verified:" if english_mode else "סמן/י ✓ בכל משפט שבדקת:"
+    return f"""
+<div style="margin-top:14px; background:#eaf3fb; border:1.5px solid #2980b9;
+     border-radius:8px; padding:12px 14px;
+     break-before:avoid; page-break-before:avoid; break-inside:avoid;">
+    <div class="section-title">{title_txt}</div>
+    <div style="font-size:12px; color:#555; margin-bottom:8px;">{note_txt}</div>
+    {items}
+</div>"""
+
+
 def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = False,
-                   topic_image: Optional[str] = None) -> str:
+                   topic_image: Optional[str] = None,
+                   svg_decorative: Optional[str] = None,
+                   extra_svgs: Optional[List[str]] = None) -> str:
     try:
         _lines = int(data.get('lines_needed') or 10)
     except (TypeError, ValueError):
@@ -23,10 +88,10 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
         </div>
         """
         scaffold_title = "\U0001f4dd Writing Structure (scaffold)"
-        write_title = "\u270f\ufe0f Write here:"
-        guiding_title = "\u2753 Guiding Questions"
+        write_title = "✏️ Write here:"
+        guiding_title = "❓ Guiding Questions"
         scope_label = "Scope:"
-        footer_text = f"Al-HaSadeh | Methods Station | {title} | Round {round_num} \u2014 {lbl['footer_copy']}"
+        footer_text = f"Al-HaSadeh | Methods Station | {title} | Round {round_num} — {lbl['footer_copy']}"
         html_dir = "ltr"
         html_lang = "en"
         page_title = f"Methods Station - {title} - Round {round_num}"
@@ -34,16 +99,16 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
     else:
         traffic = f"""
         <div class="traffic-light">
-            <div class="tl-green"><div class="tl-label">\U0001f7e2 \u05d1\u05e1\u05d9\u05e1\u05d9</div>{dl.get('green', '')}</div>
-            <div class="tl-yellow"><div class="tl-label">\U0001f7e1 \u05e8\u05d2\u05d9\u05dc</div>{dl.get('yellow', '')}</div>
-            <div class="tl-red"><div class="tl-label">\U0001f534 \u05de\u05d0\u05ea\u05d2\u05e8</div>{dl.get('red', '')}</div>
+            <div class="tl-green"><div class="tl-label">\U0001f7e2 בסיסי</div>{dl.get('green', '')}</div>
+            <div class="tl-yellow"><div class="tl-label">\U0001f7e1 רגיל</div>{dl.get('yellow', '')}</div>
+            <div class="tl-red"><div class="tl-label">\U0001f534 מאתגר</div>{dl.get('red', '')}</div>
         </div>
         """
-        scope_label = "\u05d4\u05d9\u05e7\u05e3:"
-        guiding_title = "\u2753 \u05e9\u05d0\u05dc\u05d5\u05ea \u05de\u05e0\u05d7\u05d5\u05ea"
+        scope_label = "היקף:"
+        guiding_title = "❓ שאלות מנחות"
         html_dir = "rtl"
         html_lang = "he"
-        page_title = f"\u05ea\u05d7\u05e0\u05ea \u05e9\u05d9\u05d8\u05d5\u05ea - {title} - \u05e1\u05d1\u05d1 {round_num}"
+        page_title = f"תחנת שיטות - {title} - סבב {round_num}"
         list_padding = "padding-right:20px;"
 
     guiding = "".join([f'<li style="margin-bottom:4px;">{q}</li>' for q in data.get('guiding_questions', [])])
@@ -54,16 +119,16 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
     fw_steps_html = ""
     if framework_steps:
         fw_label = {
-            'scientific_method': '\U0001f52c \u05de\u05ea\u05d5\u05d3\u05d4 \u05de\u05d3\u05e2\u05d9\u05ea',
-            'EDP': '\U0001f3d7\ufe0f \u05ea\u05d4\u05dc\u05d9\u05da \u05ea\u05d9\u05db\u05d5\u05df \u05d4\u05e0\u05d3\u05e1\u05d9 (EDP)',
-            'data_analysis': '\U0001f4ca \u05e0\u05d9\u05ea\u05d5\u05d7 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd',
-            'mathematical_thinking': '\U0001f4d0 \u05d7\u05e9\u05d9\u05d1\u05d4 \u05de\u05ea\u05de\u05d8\u05d9\u05ea',
-            'art_design': '\U0001f3a8 \u05d7\u05e9\u05d9\u05d1\u05d4 \u05e2\u05d9\u05e6\u05d5\u05d1\u05d9\u05ea',
-        }.get(data.get('thinking_framework', ''), '\U0001f52c \u05de\u05e1\u05d2\u05e8\u05ea \u05d7\u05e9\u05d9\u05d1\u05d4')
+            'scientific_method': '\U0001f52c מתודה מדעית',
+            'EDP': '\U0001f3d7️ תהליך תיכון הנדסי (EDP)',
+            'data_analysis': '\U0001f4ca ניתוח נתונים',
+            'mathematical_thinking': '\U0001f4d0 חשיבה מתמטית',
+            'art_design': '\U0001f3a8 חשיבה עיצובית',
+        }.get(data.get('thinking_framework', ''), '\U0001f52c מסגרת חשיבה')
         steps_li = "".join([f"<li>{s}</li>" for s in framework_steps])
         fw_steps_html = f"""
         <div class="section-block" style="margin-bottom:12px;">
-            <div class="section-title">{fw_label} \u2014 \u05e9\u05dc\u05d1\u05d9 \u05d4\u05e2\u05d1\u05d5\u05d3\u05d4</div>
+            <div class="section-title">{fw_label} — שלבי העבודה</div>
             <ol style="font-size:12.5px; padding-right:20px; margin-top:6px;">{steps_li}</ol>
         </div>"""
 
@@ -72,22 +137,22 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
     if context_data:
         context_html = f"""
         <div class="section-block" style="margin-bottom:12px; background:#fef9e7; border:2px solid #f39c12; border-radius:8px; padding:10px 14px;">
-            <div style="font-weight:700; color:#e67e22; margin-bottom:6px;">\U0001f4ca \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd / \u05d4\u05e7\u05e9\u05e8 \u05dc\u05e0\u05d9\u05ea\u05d5\u05d7:</div>
+            <div style="font-weight:700; color:#e67e22; margin-bottom:6px;">\U0001f4ca נתונים / הקשר לניתוח:</div>
             <div style="font-size:12.5px; line-height:1.8;">{str(context_data).replace(chr(10), '<br>')}</div>
         </div>"""
 
     is_steam = bool(framework_steps or context_data)
     if english_mode:
         scaffold_title = "\U0001f4dd Writing Structure (scaffold)"
-        write_title = "\u270f\ufe0f Write here:"
+        write_title = "✏️ Write here:"
     elif is_steam:
-        scaffold_title = "\U0001f4dd \u05de\u05e1\u05d2\u05e8\u05ea / \u05e4\u05d9\u05d2\u05d5\u05dd \u05dc\u05d7\u05e9\u05d9\u05d1\u05d4"
-        write_title = "\u270f\ufe0f \u05db\u05ea\u05d5\u05d1/\u05db\u05ea\u05d1\u05d9 \u05d0\u05ea \u05d4\u05e0\u05d9\u05ea\u05d5\u05d7/\u05d4\u05d3\u05d5\u05d7/\u05d4\u05e4\u05ea\u05e8\u05d5\u05df:"
-        footer_text = f"\u05d0\"\u05dc \u05d4\u05e9\u05d3\"\u05d4 STEAM | \u05ea\u05d7\u05e0\u05ea \u05e9\u05d9\u05d8\u05d5\u05ea | {title} | \u05e1\u05d1\u05d1 {round_num} \u2014 \u00a9 \u05db\u05dc \u05d4\u05d6\u05db\u05d5\u05d9\u05d5\u05ea \u05e9\u05de\u05d5\u05e8\u05d5\u05ea"
+        scaffold_title = "\U0001f4dd מסגרת / פיגום לחשיבה"
+        write_title = "✏️ כתוב/כתבי את הניתוח/הדוח/הפתרון:"
+        footer_text = f"א\"ל השד\"ה STEAM | תחנת שיטות | {title} | סבב {round_num} — © כל הזכויות שמורות"
     else:
-        scaffold_title = "\U0001f4dd \u05de\u05d1\u05e0\u05d4 \u05d4\u05db\u05ea\u05d9\u05d1\u05d4 (\u05e4\u05d9\u05d2\u05d5\u05dd)"
-        write_title = "\u270f\ufe0f \u05db\u05ea\u05d5\u05d1/\u05db\u05ea\u05d1\u05d9 \u05db\u05d0\u05df:"
-        footer_text = f"\u05d0\"\u05dc \u05d4\u05e9\u05d3\"\u05d4 | \u05ea\u05d7\u05e0\u05ea \u05e9\u05d9\u05d8\u05d5\u05ea | {title} | \u05e1\u05d1\u05d1 {round_num} \u2014 \u00a9 \u05db\u05dc \u05d4\u05d6\u05db\u05d5\u05d9\u05d5\u05ea \u05e9\u05de\u05d5\u05e8\u05d5\u05ea"
+        scaffold_title = "\U0001f4dd מבנה הכתיבה (פיגום)"
+        write_title = "✏️ כתוב/כתבי כאן:"
+        footer_text = f"א\"ל השד\"ה | תחנת שיטות | {title} | סבב {round_num} — © כל הזכויות שמורות"
 
     # Topic image float
     image_html = ""
@@ -116,7 +181,7 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
 <div class="instruction-box">\U0001f4cc {data.get('main_instruction', '')}</div>
 
 <div style="background:#d6eaf8; border:2px solid #2980b9; border-radius:8px; padding:10px 14px; margin-bottom:12px;">
-    <div style="font-weight:700; font-size:14px; color:#1a5276; margin-bottom:6px;">\u270f\ufe0f {data.get('context_prompt', '')}</div>
+    <div style="font-weight:700; font-size:14px; color:#1a5276; margin-bottom:6px;">✏️ {data.get('context_prompt', '')}</div>
     <div style="font-size:12px; color:#555;">{scope_label} {data.get('words_range', '')}</div>
 </div>
 
@@ -134,10 +199,14 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
     <div style="background:#eaf3fb; border:1px solid #2980b9; border-radius:6px; padding:10px; font-size:12.5px; margin-top:6px; line-height:1.7;">{scaffold}</div>
 </div>
 
+{_svg_row_html(extra_svgs)}
+
 <div class="section-block">
     <div class="section-title">{write_title}</div>
     <div class="writing-box">{lines_html}</div>
 </div>
 
+{_self_review_html(data.get('self_review_checklist', []), english_mode=english_mode)}
+{_svg_decorative_html(svg_decorative)}
 <div class="page-footer">{footer_text}</div>
 </body></html>"""

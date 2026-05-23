@@ -13,6 +13,9 @@ from app.core.exceptions import AppError
 # Push LLM keys from pydantic settings into os.environ so src/gemini.py can read them
 os.environ.setdefault("GEMINI_API_KEY", settings.GEMINI_API_KEY)
 os.environ.setdefault("GEMINI_API_KEY_2", settings.GEMINI_API_KEY_2)
+os.environ.setdefault("GEMINI_API_KEY_3", settings.GEMINI_API_KEY_3)
+os.environ.setdefault("GEMINI_API_KEY_4", settings.GEMINI_API_KEY_4)
+os.environ.setdefault("GPT_API_KEY", settings.GPT_API_KEY)
 os.environ.setdefault("ANTHROPIC_API_KEY", settings.ANTHROPIC_API_KEY)
 os.environ.setdefault("PEXELS_API_KEY", settings.PEXELS_API_KEY)
 from app.core.logging import get_logger, setup_logging

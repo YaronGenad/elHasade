@@ -2,7 +2,7 @@ import json
 import os
 import threading
 import time
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import structlog
 from google import genai
@@ -18,9 +18,21 @@ from .config import (
 
 log = structlog.get_logger(__name__)
 
-_client_k1: genai.Client | None = None
-_client_k2: genai.Client | None = None
-_client_lock = threading.Lock()
+# ── Gemini client pool (one client per unique API key) ────────────────────────
+_clients: Dict[str, genai.Client] = {}
+_exhausted_keys: set = set()       # keys that hit daily/per-day quota
+_keys_lock = threading.Lock()
+
+# All env-var names that may carry a Gemini key (duplicates are deduplicated)
+_ALL_GEMINI_KEY_VARS = [
+    "GEMINI_API_KEY",
+    "GEMINI_API_KEY_2",
+    "GEMINI_API_KEY_BECKUP",
+    "GEMINI_API_KEY_BECKUP2",
+    "GEMINI_API_KEY_BECKUP3",
+    "GEMINI_API_KEY_3",
+    "GEMINI_API_KEY_4",
+]
 
 _call_sequence: int = 0
 _seq_lock = threading.Lock()
@@ -36,22 +48,23 @@ def _next_seq() -> int:
         return _call_sequence
 
 
-def _get_gemini_client(seq: int) -> genai.Client:
-    global _client_k1, _client_k2
-    key1 = os.environ.get("GEMINI_API_KEY")
-    key2 = os.environ.get("GEMINI_API_KEY_2")
-    if not key1:
-        raise ValueError("GEMINI_API_KEY not found. Check your .env file.")
-    use_key2 = bool(key2) and (seq % 2 == 1)
-    with _client_lock:
-        if use_key2:
-            if _client_k2 is None:
-                _client_k2 = genai.Client(api_key=key2)
-            return _client_k2
-        else:
-            if _client_k1 is None:
-                _client_k1 = genai.Client(api_key=key1)
-            return _client_k1
+def _get_available_gemini_keys() -> List[str]:
+    """Return unique, non-empty Gemini keys collected from all env-var slots."""
+    seen: set = set()
+    keys: List[str] = []
+    for var in _ALL_GEMINI_KEY_VARS:
+        v = os.environ.get(var, "").strip()
+        if v and v not in seen:
+            seen.add(v)
+            keys.append(v)
+    return keys
+
+
+def _get_gemini_client(key: str) -> genai.Client:
+    with _keys_lock:
+        if key not in _clients:
+            _clients[key] = genai.Client(api_key=key)
+        return _clients[key]
 
 
 def _extract_usage(response: Any) -> Dict[str, int]:
@@ -97,11 +110,12 @@ def _is_daily_quota_error(err_str: str) -> bool:
     )
 
 
+# ── Gemini (primary) ─────────────────────────────────────────────────────────
+
 def _call_gemini(
     prompt: str, max_retries: int = GEMINI_MAX_RETRIES
 ) -> Tuple[Dict[str, Any], Dict[str, int]]:
     seq = _next_seq()
-    client = _get_gemini_client(seq)
     # Disable thinking tokens: flash models consume output budget on internal reasoning;
     # we need all output tokens for JSON.
     config = types.GenerateContentConfig(
@@ -113,99 +127,285 @@ def _call_gemini(
     last_exc: Exception = Exception(f"No models available (seq={seq})")
 
     for model in models:
-        quota_exhausted = False
-        for attempt in range(max_retries):
-            log.info(
-                "gemini_request",
-                seq=seq,
-                attempt=attempt + 1,
-                max_retries=max_retries,
-                model=model,
-                key_slot=1 + (seq % 2),
-                prompt_chars=len(prompt),
-            )
-            try:
-                response = client.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config=config,
-                )
-                usage = _extract_usage(response)
+        active_keys = [k for k in _get_available_gemini_keys() if k not in _exhausted_keys]
+        if not active_keys:
+            log.warning("gemini_all_keys_exhausted", seq=seq, model=model)
+            break
+
+        # Round-robin starting key for this seq; rotate through all active keys per model
+        start = seq % len(active_keys)
+        ordered_keys = active_keys[start:] + active_keys[:start]
+
+        for key in ordered_keys:
+            client = _get_gemini_client(key)
+            key_prefix = key[:12]
+            quota_exhausted = False
+
+            for attempt in range(max_retries):
                 log.info(
-                    "gemini_response_ok",
+                    "gemini_request",
                     seq=seq,
                     attempt=attempt + 1,
+                    max_retries=max_retries,
                     model=model,
-                    input_tokens=usage["input_tokens"],
-                    output_tokens=usage["output_tokens"],
-                    cached_tokens=usage["cached_tokens"],
+                    key_prefix=key_prefix,
+                    prompt_chars=len(prompt),
                 )
-                text = response.text.strip()
-                return _parse_json(text), usage
-
-            except json.JSONDecodeError as e:
-                text_val = locals().get("text", "")
-                log.warning(
-                    "gemini_json_parse_error",
-                    seq=seq,
-                    attempt=attempt + 1,
-                    model=model,
-                    error=str(e),
-                    response_tail=text_val[-300:] if len(text_val) > 300 else text_val,
-                )
-                last_exc = e
-                if attempt == max_retries - 1:
-                    raise
-
-            except Exception as e:
-                err_str = str(e)
-                last_exc = e
-                is_quota = "429" in err_str or "quota" in err_str.lower() or "RESOURCE_EXHAUSTED" in err_str
-
-                if is_quota:
-                    if _is_daily_quota_error(err_str):
-                        # Daily limit — no point retrying; try next model immediately
-                        log.warning(
-                            "gemini_daily_quota_exhausted",
-                            seq=seq,
-                            model=model,
-                            next_model=models[models.index(model) + 1] if model != models[-1] else "none",
-                            error=err_str[:300],
-                        )
-                        quota_exhausted = True
-                        break  # exit attempt loop → move to next model
-                    else:
-                        # Per-minute rate limit — wait and retry same model
-                        wait = GEMINI_RATE_LIMIT_BACKOFF_BASE * (attempt + 1)
-                        log.warning(
-                            "gemini_rate_limit",
-                            seq=seq,
-                            attempt=attempt + 1,
-                            model=model,
-                            wait_seconds=wait,
-                            error=err_str[:300],
-                        )
-                        time.sleep(wait)
-                else:
-                    log.error(
-                        "gemini_api_error",
+                try:
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=prompt,
+                        config=config,
+                    )
+                    usage = _extract_usage(response)
+                    log.info(
+                        "gemini_response_ok",
                         seq=seq,
                         attempt=attempt + 1,
                         model=model,
-                        error_type=type(e).__name__,
-                        error=err_str[:300],
+                        key_prefix=key_prefix,
+                        input_tokens=usage["input_tokens"],
+                        output_tokens=usage["output_tokens"],
+                        cached_tokens=usage["cached_tokens"],
                     )
+                    text = response.text.strip()
+                    return _parse_json(text), usage
+
+                except json.JSONDecodeError as e:
+                    text_val = locals().get("text", "")
+                    log.warning(
+                        "gemini_json_parse_error",
+                        seq=seq,
+                        attempt=attempt + 1,
+                        model=model,
+                        key_prefix=key_prefix,
+                        error=str(e),
+                        response_tail=text_val[-300:] if len(text_val) > 300 else text_val,
+                    )
+                    last_exc = e
                     if attempt == max_retries - 1:
                         raise
 
-        if quota_exhausted:
-            continue  # try next model in chain
+                except Exception as e:
+                    err_str = str(e)
+                    last_exc = e
+                    is_quota = "429" in err_str or "quota" in err_str.lower() or "RESOURCE_EXHAUSTED" in err_str
+
+                    if is_quota:
+                        if _is_daily_quota_error(err_str):
+                            log.warning(
+                                "gemini_daily_quota_exhausted",
+                                seq=seq,
+                                model=model,
+                                key_prefix=key_prefix,
+                                error=err_str[:300],
+                            )
+                            with _keys_lock:
+                                _exhausted_keys.add(key)
+                            quota_exhausted = True
+                            break  # exit attempt loop → try next key
+                        else:
+                            # Per-minute rate limit — wait and retry same key/model
+                            wait = GEMINI_RATE_LIMIT_BACKOFF_BASE * (attempt + 1)
+                            log.warning(
+                                "gemini_rate_limit",
+                                seq=seq,
+                                attempt=attempt + 1,
+                                model=model,
+                                key_prefix=key_prefix,
+                                wait_seconds=wait,
+                                error=err_str[:300],
+                            )
+                            time.sleep(wait)
+                    else:
+                        log.error(
+                            "gemini_api_error",
+                            seq=seq,
+                            attempt=attempt + 1,
+                            model=model,
+                            key_prefix=key_prefix,
+                            error_type=type(e).__name__,
+                            error=err_str[:300],
+                        )
+                        if attempt == max_retries - 1:
+                            raise
+
+            # If key hit daily quota, continue to next key (quota_exhausted flag set)
+            # Otherwise all retries exhausted for this key — move to next key
 
     raise last_exc
 
 
+# ── OpenAI fallback ───────────────────────────────────────────────────────────
+
+def _call_openai(
+    prompt: str, max_retries: int = 3
+) -> Tuple[Dict[str, Any], Dict[str, int]]:
+    from openai import OpenAI
+
+    api_key = os.environ.get("GPT_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("GPT_API_KEY not set")
+
+    client = OpenAI(api_key=api_key)
+    model = "gpt-4o-mini"
+    last_exc: Exception = Exception("OpenAI: no attempts made")
+
+    for attempt in range(max_retries):
+        log.info("openai_request", attempt=attempt + 1, model=model, prompt_chars=len(prompt))
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=8192,
+                response_format={"type": "json_object"},
+            )
+            text = response.choices[0].message.content or ""
+            usage_obj = response.usage
+            usage: Dict[str, int] = {
+                "input_tokens": getattr(usage_obj, "prompt_tokens", 0) or 0,
+                "output_tokens": getattr(usage_obj, "completion_tokens", 0) or 0,
+                "cached_tokens": 0,
+            }
+            log.info(
+                "openai_response_ok",
+                attempt=attempt + 1,
+                model=model,
+                input_tokens=usage["input_tokens"],
+                output_tokens=usage["output_tokens"],
+            )
+            return _parse_json(text), usage
+
+        except json.JSONDecodeError as e:
+            log.warning("openai_json_parse_error", attempt=attempt + 1, error=str(e))
+            last_exc = e
+            if attempt == max_retries - 1:
+                raise
+
+        except Exception as e:
+            err_str = str(e)
+            last_exc = e
+            log.warning(
+                "openai_api_error",
+                attempt=attempt + 1,
+                error_type=type(e).__name__,
+                error=err_str[:300],
+            )
+            if attempt == max_retries - 1:
+                raise
+            wait = 5 * (attempt + 1)
+            time.sleep(wait)
+
+    raise last_exc
+
+
+# ── Anthropic fallback ────────────────────────────────────────────────────────
+
+def _call_anthropic(
+    prompt: str, max_retries: int = 3
+) -> Tuple[Dict[str, Any], Dict[str, int]]:
+    import anthropic as _anthropic
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY not set")
+
+    client = _anthropic.Anthropic(api_key=api_key)
+    model = "claude-haiku-4-5-20251001"
+    system_prompt = (
+        "You are a JSON generator. Always respond with valid JSON only — "
+        "no markdown, no code fences, no explanation."
+    )
+    last_exc: Exception = Exception("Anthropic: no attempts made")
+
+    for attempt in range(max_retries):
+        log.info("anthropic_request", attempt=attempt + 1, model=model, prompt_chars=len(prompt))
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=8192,
+                system=system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text if response.content else ""
+            usage_obj = response.usage
+            usage: Dict[str, int] = {
+                "input_tokens": getattr(usage_obj, "input_tokens", 0) or 0,
+                "output_tokens": getattr(usage_obj, "output_tokens", 0) or 0,
+                "cached_tokens": 0,
+            }
+            log.info(
+                "anthropic_response_ok",
+                attempt=attempt + 1,
+                model=model,
+                input_tokens=usage["input_tokens"],
+                output_tokens=usage["output_tokens"],
+            )
+            return _parse_json(text), usage
+
+        except json.JSONDecodeError as e:
+            log.warning("anthropic_json_parse_error", attempt=attempt + 1, error=str(e))
+            last_exc = e
+            if attempt == max_retries - 1:
+                raise
+
+        except Exception as e:
+            err_str = str(e)
+            last_exc = e
+            log.warning(
+                "anthropic_api_error",
+                attempt=attempt + 1,
+                error_type=type(e).__name__,
+                error=err_str[:300],
+            )
+            if attempt == max_retries - 1:
+                raise
+            wait = 5 * (attempt + 1)
+            time.sleep(wait)
+
+    raise last_exc
+
+
+# ── Public entry point ────────────────────────────────────────────────────────
+
 def call_gemini(
     prompt: str, max_retries: int = GEMINI_MAX_RETRIES
 ) -> Tuple[Dict[str, Any], Dict[str, int]]:
-    """Public entry point. Returns (result_dict, usage_dict)."""
-    return _call_gemini(prompt, max_retries)
+    """Try Gemini (all keys, round-robin) → OpenAI → Anthropic."""
+    try:
+        return _call_gemini(prompt, max_retries)
+    except Exception as gemini_exc:
+        log.warning(
+            "gemini_all_keys_failed",
+            error=str(gemini_exc)[:300],
+            trying_fallback="openai",
+        )
+
+    try:
+        result, usage = _call_openai(prompt)
+        log.info("openai_fallback_success")
+        return result, usage
+    except Exception as openai_exc:
+        log.warning(
+            "openai_fallback_failed",
+            error=str(openai_exc)[:300],
+            trying_fallback="anthropic",
+        )
+
+    try:
+        result, usage = _call_anthropic(prompt)
+        log.info("anthropic_fallback_success")
+        return result, usage
+    except Exception as anthropic_exc:
+        log.error(
+            "all_providers_failed",
+            gemini=str(gemini_exc)[:200],
+            openai=str(openai_exc)[:200],
+            anthropic=str(anthropic_exc)[:200],
+        )
+        # Import here to avoid circular dependency at module load time
+        from .exceptions import LLMAPIError
+        raise LLMAPIError(
+            message="All LLM providers failed",
+            detail=f"Gemini: {gemini_exc} | OpenAI: {openai_exc} | Anthropic: {anthropic_exc}",
+        ) from anthropic_exc
