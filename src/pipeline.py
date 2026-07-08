@@ -12,7 +12,7 @@ from .config import (
     GEMINI_FLASH_INPUT_COST_PER_1M, GEMINI_FLASH_OUTPUT_COST_PER_1M,
     GEMINI_MAX_COST_PER_GENERATION_USD,
 )
-from .images import ImageService
+from .images import ImageService, UsedImageKeys
 
 _PROVIDER_LABEL = "Gemini"
 log = structlog.get_logger(__name__)
@@ -119,7 +119,8 @@ def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> 
 
 def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_num: int,
                    output_dir: str = "output",
-                   prev_texts: List[str] | None = None) -> Dict[str, Any]:
+                   prev_texts: List[str] | None = None,
+                   used_image_keys: "UsedImageKeys | None" = None) -> Dict[str, Any]:
     if prev_texts is None:
         prev_texts = []
 
@@ -165,25 +166,25 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
         _img = ImageService()
         topic_images = {
             "comprehension": None,   # fetched after LLM generates content with story context
-            "methods":       _img.fetch(topic, grade, "methods", round_num),
-            "precision":     _img.fetch(topic, grade, "precision", round_num),
-            "vocabulary":    _img.fetch(topic, grade, "vocabulary", round_num),
+            "methods":       _img.fetch(topic, grade, "methods", round_num, used_image_keys=used_image_keys),
+            "precision":     _img.fetch(topic, grade, "precision", round_num, used_image_keys=used_image_keys),
+            "vocabulary":    _img.fetch(topic, grade, "vocabulary", round_num, used_image_keys=used_image_keys),
         }
         svg_images = {
-            "comprehension": _img.generate_svg_illustration(topic, "comprehension", round_num),
-            "methods":       _img.generate_svg_illustration(topic, "methods", round_num),
-            "precision":     _img.generate_svg_illustration(topic, "precision", round_num),
-            "vocabulary":    _img.generate_svg_illustration(topic, "vocabulary", round_num),
+            "comprehension": _img.generate_svg_illustration(topic, "comprehension", round_num, used_image_keys=used_image_keys),
+            "methods":       _img.generate_svg_illustration(topic, "methods", round_num, used_image_keys=used_image_keys),
+            "precision":     _img.generate_svg_illustration(topic, "precision", round_num, used_image_keys=used_image_keys),
+            "vocabulary":    _img.generate_svg_illustration(topic, "vocabulary", round_num, used_image_keys=used_image_keys),
         }
         decorative_images = {
-            "comprehension": _img.fetch_decorative(topic, "comprehension", round_num),
-            "precision":   _img.fetch_decorative(topic, "precision", round_num),
-            "vocabulary":  _img.fetch_decorative(topic, "vocabulary", round_num),
+            "comprehension": _img.fetch_decorative(topic, "comprehension", round_num, used_image_keys=used_image_keys),
+            "precision":   _img.fetch_decorative(topic, "precision", round_num, used_image_keys=used_image_keys),
+            "vocabulary":  _img.fetch_decorative(topic, "vocabulary", round_num, used_image_keys=used_image_keys),
         }
         # Small decorative SVG rows for filling whitespace in comprehension & methods
         extra_svgs_map = {
-            "comprehension": _img.generate_mini_svgs(topic, "comprehension", round_num, count=2),
-            "methods":       _img.generate_mini_svgs(topic, "methods", round_num, count=1),
+            "comprehension": _img.generate_mini_svgs(topic, "comprehension", round_num, count=2, used_image_keys=used_image_keys),
+            "methods":       _img.generate_mini_svgs(topic, "methods", round_num, count=1, used_image_keys=used_image_keys),
         }
 
         log.info("images_fetched",
@@ -285,7 +286,8 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     content['comprehension'] = comp_data
     if not english_mode:
         _comp_hint = f"{comp_data.get('section_title', '')} {comp_data.get('intro_sentence', '')}"
-        topic_images["comprehension"] = _img.fetch(topic, grade, "comprehension", round_num, hint=_comp_hint)
+        topic_images["comprehension"] = _img.fetch(topic, grade, "comprehension", round_num,
+                                                  hint=_comp_hint, used_image_keys=used_image_keys)
         log.info("comprehension_image_fetched", hint_chars=len(_comp_hint),
                  found=bool(topic_images["comprehension"]))
     comp_html = _render("comprehension", render_comprehension, topic, round_num, comp_data, grade,
@@ -447,12 +449,17 @@ def generate_all_rounds(user_input: Dict[str, Any], roadmap: Dict[str, Any], out
     results_by_round: Dict[int, Any] = {}
     cancel_event = threading.Event()
 
+    # Shared across all parallel rounds: prevents the same image from being used
+    # for two different stations/rounds within this generation.
+    used_image_keys = UsedImageKeys()
+
     def _run_round(round_num: int) -> Any:
         if cancel_event.is_set():
             return None
         inp = dict(user_input)
         inp['_accumulated_cost_usd'] = 0.0  # each round tracks its own cost vs per-round limit
-        return generate_round(inp, roadmap, round_num, output_dir, prev_texts=[])
+        return generate_round(inp, roadmap, round_num, output_dir, prev_texts=[],
+                              used_image_keys=used_image_keys)
 
     workers = min(total, 4)
     log.info("parallel_rounds_start", total=total, workers=workers)

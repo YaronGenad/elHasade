@@ -55,6 +55,15 @@ services:
       REDIS_URL: redis://redis:6379
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_API_KEY_2: ${GEMINI_API_KEY_2:-}
+      GEMINI_API_KEY_BECKUP: ${GEMINI_API_KEY_BECKUP:-}
+      GEMINI_API_KEY_BECKUP2: ${GEMINI_API_KEY_BECKUP2:-}
+      GEMINI_API_KEY_BECKUP3: ${GEMINI_API_KEY_BECKUP3:-}
+      GEMINI_API_KEY_3: ${GEMINI_API_KEY_3:-}
+      GEMINI_API_KEY_4: ${GEMINI_API_KEY_4:-}
+      GPT_API_KEY: ${GPT_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PEXEL_API_KEY: ${PEXEL_API_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       DEBUG: ${DEBUG:-false}
       OUTPUT_DIR: /app/output
@@ -67,7 +76,7 @@ services:
     volumes:
       - generated_materials:/app/output
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://localhost:8000/health', timeout=5) or sys.exit(1)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -84,7 +93,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

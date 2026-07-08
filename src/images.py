@@ -35,6 +35,55 @@ _translation_cache: dict = {}
 _translation_lock = threading.Lock()
 
 
+def _identifier_for_bytes(data: bytes) -> str:
+    """Stable per-image identifier used to detect duplicates within one generation."""
+    return hashlib.sha256(data).hexdigest()[:16]
+
+
+def _identifier_for_url(url: str) -> str:
+    """Stable identifier for a remote photo URL (used before we download)."""
+    return hashlib.sha256(url.encode()).hexdigest()[:16]
+
+
+def _claim_unique(data: Optional[bytes], used_image_keys: Optional["UsedImageKeys"]) -> Optional[bytes]:
+    """Return `data` if the tracker can claim its identifier; otherwise None."""
+    if not data:
+        return None
+    if used_image_keys is None:
+        return data
+    if used_image_keys.try_claim(_identifier_for_bytes(data)):
+        return data
+    return None
+
+
+class UsedImageKeys:
+    """Thread-safe set of image identifiers already used in the current generation.
+
+    Generation runs rounds in a ThreadPool, so multiple stations can hit the
+    image service concurrently. `try_claim` atomically reserves an identifier:
+    returns True if the caller now owns it, False if another caller already did.
+    """
+
+    def __init__(self):
+        self._used: set[str] = set()
+        self._lock = threading.Lock()
+
+    def try_claim(self, identifier: str) -> bool:
+        if not identifier:
+            return True
+        with self._lock:
+            if identifier in self._used:
+                return False
+            self._used.add(identifier)
+            return True
+
+    def release(self, identifier: str) -> None:
+        if not identifier:
+            return
+        with self._lock:
+            self._used.discard(identifier)
+
+
 class ImageService:
     CACHE_DIR = Path(__file__).parent.parent / "cache" / "images"
 
@@ -56,6 +105,15 @@ class ImageService:
 
     SVG_VARIATIONS = ["spring morning", "summer afternoon", "autumn evening", "winter day"]
 
+    # Per-station offset into provider result lists, so different stations of the
+    # same round pick different photos even when their queries overlap.
+    STATION_OFFSETS = {
+        "comprehension": 0,
+        "methods":       5,
+        "precision":     10,
+        "vocabulary":    15,
+    }
+
     def __init__(self):
         self.pexels_key = os.getenv("PEXELS_API_KEY") or os.getenv("PEXEL_API_KEY")
         self.gemini_key = os.getenv("GEMINI_API_KEY")
@@ -63,14 +121,20 @@ class ImageService:
     # ── Public: topic image ──────────────────────────────────────────────────────
 
     def fetch(self, topic: str, grade: str, station: str, round_num: int = 1,
-              hint: str = "") -> Optional[str]:
+              hint: str = "", used_image_keys: Optional["UsedImageKeys"] = None) -> Optional[str]:
         """Return absolute path to a cached image file, or None if unavailable.
-        hint: story section_title + intro_sentence for context-aware image search."""
+        hint: story section_title + intro_sentence for context-aware image search.
+        used_image_keys: optional per-generation tracker that prevents the same source
+        image from being reused for a different station/round of the same generation."""
         hint_key = hashlib.sha256(hint[:60].encode()).hexdigest()[:8] if hint else ""
         key = hashlib.sha256(f"{topic}|{grade}|{station}|{round_num}|{hint_key}".encode()).hexdigest()[:16]
         cache_path = self.CACHE_DIR / f"{key}.jpg"
         if cache_path.exists():
-            return str(cache_path)
+            cached_id = _identifier_for_bytes(cache_path.read_bytes())
+            if used_image_keys is None or used_image_keys.try_claim(cached_id):
+                return str(cache_path)
+            # Cache hit but the same bytes were already used in this generation —
+            # fall through to fetch a different image and overwrite this cache slot.
 
         if hint:
             english_topic = self._translate_with_hint(topic, hint)
@@ -80,13 +144,27 @@ class ImageService:
             query_template = self.STATION_PEXELS_QUERIES.get(station, "{topic} education")
             pexels_query = query_template.format(topic=english_topic)
 
-        data = (
-            self._try_pexels(pexels_query, round_num)
-            or self._try_wikimedia(topic, round_num, english_hint=english_topic if hint else "")
-            or self._try_imagen_fast(topic, grade, station, hint=english_topic if hint else "")
-            or self._try_imagen(topic, grade, station, hint=english_topic if hint else "")
-            or self._try_gemini_image(english_topic, station, round_num, hint=english_topic if hint else "")
+        provider_calls = (
+            lambda: self._try_pexels(pexels_query, round_num, station, used_image_keys),
+            lambda: self._try_wikimedia(topic, round_num, station,
+                                        english_hint=english_topic if hint else "",
+                                        used_image_keys=used_image_keys),
+            lambda: self._try_imagen_fast(topic, grade, station,
+                                          hint=english_topic if hint else "",
+                                          used_image_keys=used_image_keys),
+            lambda: self._try_imagen(topic, grade, station,
+                                     hint=english_topic if hint else "",
+                                     used_image_keys=used_image_keys),
+            lambda: self._try_gemini_image(english_topic, station, round_num,
+                                           hint=english_topic if hint else "",
+                                           used_image_keys=used_image_keys),
         )
+        data = None
+        for call in provider_calls:
+            data = call()
+            if data:
+                break
+
         if data:
             self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
             cache_path.write_bytes(data)
@@ -98,14 +176,26 @@ class ImageService:
 
     # ── Public: SVG illustrations ────────────────────────────────────────────────
 
-    def generate_svg_illustration(self, topic: str, station: str, round_num: int = 1) -> Optional[str]:
+    def generate_svg_illustration(self, topic: str, station: str, round_num: int = 1,
+                                  used_image_keys: Optional["UsedImageKeys"] = None) -> Optional[str]:
         """Generate a topic-aware colorful SVG banner. Returns path to cached .svg file."""
         key = hashlib.sha256(f"svg|{topic}|{station}|{round_num}".encode()).hexdigest()[:16]
         cache_path = self.CACHE_DIR / f"{key}.svg"
         if cache_path.exists():
-            return str(cache_path)
+            cached_id = _identifier_for_bytes(cache_path.read_bytes())
+            if used_image_keys is None or used_image_keys.try_claim(cached_id):
+                return str(cache_path)
 
-        svg_data = self._try_generate_svg(topic, station, round_num, variant=0, mini=False)
+        # Try a few variants if the first one collides with an already-used SVG
+        svg_data = None
+        for variant in range(len(self.SVG_VARIATIONS)):
+            candidate = self._try_generate_svg(topic, station, round_num, variant=variant, mini=False)
+            if not candidate:
+                continue
+            candidate_id = _identifier_for_bytes(candidate.encode("utf-8"))
+            if used_image_keys is None or used_image_keys.try_claim(candidate_id):
+                svg_data = candidate
+                break
         if svg_data:
             self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
             cache_path.write_text(svg_data, encoding="utf-8")
@@ -116,7 +206,8 @@ class ImageService:
         return None
 
     def generate_mini_svgs(self, topic: str, station: str, round_num: int = 1,
-                           count: int = 2) -> List[str]:
+                           count: int = 2,
+                           used_image_keys: Optional["UsedImageKeys"] = None) -> List[str]:
         """Generate `count` small decorative SVGs (160×120) for whitespace rows.
         Returns list of cached .svg paths (may be shorter than count if generation fails)."""
         paths = []
@@ -125,11 +216,16 @@ class ImageService:
             key = hashlib.sha256(f"mini|{topic}|{station}|{round_num}|{variant}".encode()).hexdigest()[:16]
             cache_path = self.CACHE_DIR / f"{key}.svg"
             if cache_path.exists():
-                paths.append(str(cache_path))
-                continue
+                cached_id = _identifier_for_bytes(cache_path.read_bytes())
+                if used_image_keys is None or used_image_keys.try_claim(cached_id):
+                    paths.append(str(cache_path))
+                    continue
             svg_data = self._try_generate_svg(english_topic, station, round_num,
                                               variant=variant, mini=True)
             if svg_data:
+                if used_image_keys is not None and \
+                   not used_image_keys.try_claim(_identifier_for_bytes(svg_data.encode("utf-8"))):
+                    continue
                 self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
                 cache_path.write_text(svg_data, encoding="utf-8")
                 log.info("mini_svg_cached", key=key, topic=topic, station=station, variant=variant)
@@ -138,12 +234,15 @@ class ImageService:
 
     # ── Public: decorative bottom illustration ───────────────────────────────────
 
-    def fetch_decorative(self, topic: str, station: str, round_num: int = 1) -> Optional[str]:
+    def fetch_decorative(self, topic: str, station: str, round_num: int = 1,
+                         used_image_keys: Optional["UsedImageKeys"] = None) -> Optional[str]:
         """Fetch a decorative illustration for page bottom via Imagen (cached)."""
         key = hashlib.sha256(f"deco|{topic}|{station}|{round_num}".encode()).hexdigest()[:16]
         cache_path = self.CACHE_DIR / f"{key}.jpg"
         if cache_path.exists():
-            return str(cache_path)
+            cached_id = _identifier_for_bytes(cache_path.read_bytes())
+            if used_image_keys is None or used_image_keys.try_claim(cached_id):
+                return str(cache_path)
 
         english_topic = self._translate_topic_for_pexels(topic)
         prompt = (
@@ -153,7 +252,8 @@ class ImageService:
             "Do NOT include any text, letters, words, numbers, Hebrew characters, "
             "Arabic characters, or labels of any kind. Pure illustration only."
         )
-        data = self._try_imagen_fast_prompt(prompt) or self._try_imagen_prompt(prompt)
+        data = _claim_unique(self._try_imagen_fast_prompt(prompt), used_image_keys) \
+            or _claim_unique(self._try_imagen_prompt(prompt), used_image_keys)
         if data:
             self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
             cache_path.write_bytes(data)
@@ -207,7 +307,7 @@ class ImageService:
             from google import genai as _genai
             client = _genai.Client(api_key=api_key)
             response = client.models.generate_content(
-                model="gemini-2.0-flash-lite",
+                model="gemini-2.5-flash",
                 contents=prompt,
             )
             text = response.text.strip()
@@ -249,14 +349,20 @@ class ImageService:
             from google import genai as _genai
             client = _genai.Client(api_key=key)
             response = client.models.generate_content(
-                model="gemini-2.0-flash-lite",
+                model="gemini-2.5-flash",
                 contents=(
                     f"Translate this Hebrew educational story title to 4-6 specific English "
                     f"visual keywords suitable for searching historical illustrations, paintings, or photos.\n"
                     f"Topic: {topic}\n"
                     f"Story title/context: {hint}\n"
-                    f"Focus on: characters, historical period, setting, objects visible in the story scene.\n"
-                    f"Return ONLY English keywords separated by spaces, no punctuation, no explanations."
+                    f"Rules:\n"
+                    f"- Include the proper English name of the topic itself (e.g. Passover, Hanukkah, Purim, "
+                    f"Independence Day) when the topic refers to a known holiday or event.\n"
+                    f"- Add 2-4 culturally specific visual markers unique to THIS topic "
+                    f"(e.g. matzah/seder plate for Passover, hamantaschen/masks for Purim, menorah/dreidel for Hanukkah, "
+                    f"Israeli flag/blue and white for Independence Day) — never use generic Jewish or holiday imagery.\n"
+                    f"- Avoid words that fit multiple holidays (family, meal, table, candles alone).\n"
+                    f"Return ONLY English keywords separated by spaces, no punctuation, no explanations, max 6 words total."
                 ),
             )
             translated = response.text.strip()
@@ -289,12 +395,18 @@ class ImageService:
             from google import genai as _genai
             client = _genai.Client(api_key=key)
             response = client.models.generate_content(
-                model="gemini-2.0-flash-lite",
+                model="gemini-2.5-flash",
                 contents=(
-                    f"Translate this Hebrew topic to 3-4 specific English visual keywords for image search.\n"
+                    f"Translate this Hebrew topic to specific English visual keywords for image search.\n"
                     f"Topic: {topic}\n"
-                    f"Focus on VISUAL elements that would appear in photos or illustrations about this topic.\n"
-                    f"Return ONLY English keywords separated by spaces, no punctuation, no explanations."
+                    f"Rules:\n"
+                    f"- Include the proper English name of the topic itself (e.g. Passover, Hanukkah, Purim, "
+                    f"Independence Day, Yom Kippur, April Fools) when the topic refers to a known holiday or event.\n"
+                    f"- Add 2-3 culturally specific visual markers unique to THIS topic "
+                    f"(matzah/seder plate for Passover, hamantaschen/masks for Purim, menorah/dreidel for Hanukkah, "
+                    f"Israeli flag/blue and white for Independence Day, pranks/jokes for April Fools).\n"
+                    f"- Avoid generic words that match multiple topics (family, meal, table, candles alone).\n"
+                    f"Return ONLY English keywords separated by spaces, no punctuation, no explanations, max 5 words total."
                 ),
             )
             translated = response.text.strip()
@@ -311,30 +423,53 @@ class ImageService:
 
     # ── Pexels ───────────────────────────────────────────────────────────────────
 
-    def _try_pexels(self, topic: str, round_num: int = 1) -> Optional[bytes]:
+    def _try_pexels(self, topic: str, round_num: int = 1, station: str = "",
+                    used_image_keys: Optional["UsedImageKeys"] = None) -> Optional[bytes]:
         if not self.pexels_key:
             return None
         try:
             query = urllib.parse.quote(topic)
-            # Fetch more results so round-based rotation has real variety
-            url = f"https://api.pexels.com/v1/search?query={query}&per_page=20&orientation=landscape"
-            req = urllib.request.Request(url, headers={"Authorization": self.pexels_key})
+            # Fetch enough results so 4 stations × 4 rounds = 16 distinct offsets fit
+            url = f"https://api.pexels.com/v1/search?query={query}&per_page=40&orientation=landscape"
+            req = urllib.request.Request(url, headers={
+                "Authorization": self.pexels_key,
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0",
+            })
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read())
             photos = data.get("photos", [])
             if not photos:
                 return None
-            photo_index = (round_num - 1) % len(photos)
-            photo_url = photos[photo_index]["src"]["medium"]
-            with urllib.request.urlopen(photo_url, timeout=10) as img_resp:
-                return img_resp.read()
+            station_offset = self.STATION_OFFSETS.get(station, 0)
+            base_index = (station_offset + round_num - 1) % len(photos)
+            for step in range(len(photos)):
+                idx = (base_index + step) % len(photos)
+                photo_url = photos[idx]["src"]["medium"]
+                identifier = _identifier_for_url(photo_url)
+                if used_image_keys is not None and not used_image_keys.try_claim(identifier):
+                    continue
+                try:
+                    img_req = urllib.request.Request(
+                        photo_url,
+                        headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0"},
+                    )
+                    with urllib.request.urlopen(img_req, timeout=10) as img_resp:
+                        return img_resp.read()
+                except Exception as inner_exc:
+                    log.warning("pexels_download_failed", url=photo_url[:80], error=str(inner_exc))
+                    if used_image_keys is not None:
+                        used_image_keys.release(identifier)
+                    continue
+            return None
         except Exception as exc:
             log.warning("pexels_failed", topic=topic, error=str(exc))
             return None
 
     # ── Wikimedia Commons ────────────────────────────────────────────────────────
 
-    def _try_wikimedia(self, topic: str, round_num: int = 1, english_hint: str = "") -> Optional[bytes]:
+    def _try_wikimedia(self, topic: str, round_num: int = 1, station: str = "",
+                       english_hint: str = "",
+                       used_image_keys: Optional["UsedImageKeys"] = None) -> Optional[bytes]:
         """Search Wikimedia Commons for a relevant image thumbnail (400px wide)."""
         search_queries = []
         if english_hint:
@@ -345,18 +480,19 @@ class ImageService:
             search_queries.append(first_word)
 
         for query in search_queries:
-            result = self._wikimedia_search_download(query, round_num)
+            result = self._wikimedia_search_download(query, round_num, station, used_image_keys)
             if result:
                 return result
         return None
 
-    def _wikimedia_search_download(self, query: str, round_num: int = 1) -> Optional[bytes]:
+    def _wikimedia_search_download(self, query: str, round_num: int = 1, station: str = "",
+                                   used_image_keys: Optional["UsedImageKeys"] = None) -> Optional[bytes]:
         try:
             search_url = (
                 "https://commons.wikimedia.org/w/api.php"
                 f"?action=query&list=search"
                 f"&srsearch={urllib.parse.quote(query)}"
-                "&srnamespace=6&format=json&srlimit=9"
+                "&srnamespace=6&format=json&srlimit=20"
             )
             req = urllib.request.Request(
                 search_url, headers={"User-Agent": "AlHasadeBot/1.0 (educational)"}
@@ -373,12 +509,15 @@ class ImageService:
             if not image_results:
                 return None
 
-            # Use round_num to pick different candidate per round
-            offset = (round_num - 1) % min(len(image_results), 3)
-            candidates = image_results[offset:offset + 3] or image_results[:3]
-
-            for candidate in candidates:
+            station_offset = self.STATION_OFFSETS.get(station, 0)
+            base_index = (station_offset + round_num - 1) % len(image_results)
+            for step in range(len(image_results)):
+                idx = (base_index + step) % len(image_results)
+                candidate = image_results[idx]
                 title = candidate["title"]
+                identifier = _identifier_for_url(title)
+                if used_image_keys is not None and not used_image_keys.try_claim(identifier):
+                    continue
                 info_url = (
                     "https://commons.wikimedia.org/w/api.php"
                     f"?action=query&titles={urllib.parse.quote(title)}"
@@ -387,20 +526,25 @@ class ImageService:
                 req2 = urllib.request.Request(
                     info_url, headers={"User-Agent": "AlHasadeBot/1.0 (educational)"}
                 )
-                with urllib.request.urlopen(req2, timeout=10) as resp2:
-                    info = json.loads(resp2.read())
-
-                pages = info.get("query", {}).get("pages", {})
-                for _, page in pages.items():
-                    for img_info in page.get("imageinfo", []):
-                        thumb_url = img_info.get("thumburl") or img_info.get("url", "")
-                        if not thumb_url:
-                            continue
-                        req3 = urllib.request.Request(
-                            thumb_url, headers={"User-Agent": "AlHasadeBot/1.0 (educational)"}
-                        )
-                        with urllib.request.urlopen(req3, timeout=15) as img_resp:
-                            return img_resp.read()
+                try:
+                    with urllib.request.urlopen(req2, timeout=10) as resp2:
+                        info = json.loads(resp2.read())
+                    pages = info.get("query", {}).get("pages", {})
+                    for _, page in pages.items():
+                        for img_info in page.get("imageinfo", []):
+                            thumb_url = img_info.get("thumburl") or img_info.get("url", "")
+                            if not thumb_url:
+                                continue
+                            req3 = urllib.request.Request(
+                                thumb_url, headers={"User-Agent": "AlHasadeBot/1.0 (educational)"}
+                            )
+                            with urllib.request.urlopen(req3, timeout=15) as img_resp:
+                                return img_resp.read()
+                except Exception as inner_exc:
+                    log.warning("wikimedia_candidate_failed", title=title[:80], error=str(inner_exc))
+                    if used_image_keys is not None:
+                        used_image_keys.release(identifier)
+                    continue
 
             return None
 
@@ -410,7 +554,8 @@ class ImageService:
 
     # ── Imagen 4 Fast ────────────────────────────────────────────────────────────
 
-    def _try_imagen_fast(self, topic: str, grade: str, station: str, hint: str = "") -> Optional[bytes]:
+    def _try_imagen_fast(self, topic: str, grade: str, station: str, hint: str = "",
+                         used_image_keys: Optional["UsedImageKeys"] = None) -> Optional[bytes]:
         """Imagen 4 Fast — faster/cheaper variant for topic images."""
         if hint:
             prompt = (
@@ -428,7 +573,7 @@ class ImageService:
                 "Do NOT include any text, letters, words, numbers, Hebrew characters, "
                 "Arabic characters, or labels. Pure illustration only."
             )
-        return self._try_imagen_fast_prompt(prompt)
+        return _claim_unique(self._try_imagen_fast_prompt(prompt), used_image_keys)
 
     def _try_imagen_fast_prompt(self, prompt: str) -> Optional[bytes]:
         """Call Imagen 4 Fast with a custom prompt. Returns raw image bytes or None."""
@@ -467,7 +612,8 @@ class ImageService:
 
     # ── Imagen 4 ─────────────────────────────────────────────────────────────────
 
-    def _try_imagen(self, topic: str, grade: str, station: str, hint: str = "") -> Optional[bytes]:
+    def _try_imagen(self, topic: str, grade: str, station: str, hint: str = "",
+                    used_image_keys: Optional["UsedImageKeys"] = None) -> Optional[bytes]:
         if hint:
             prompt = (
                 f"Illustration: {hint}. "
@@ -484,7 +630,7 @@ class ImageService:
                 "Do NOT include any text, letters, words, numbers, Hebrew characters, "
                 "Arabic characters, or labels. Pure illustration only."
             )
-        return self._try_imagen_prompt(prompt)
+        return _claim_unique(self._try_imagen_prompt(prompt), used_image_keys)
 
     def _try_imagen_prompt(self, prompt: str) -> Optional[bytes]:
         """Call Imagen 4 with a custom prompt. Returns raw image bytes or None."""
@@ -521,7 +667,8 @@ class ImageService:
     # ── Gemini 2.5 Flash Image Generation ("Nano Banana") ────────────────────────
 
     def _try_gemini_image(self, english_topic: str, station: str, round_num: int,
-                          hint: str = "") -> Optional[bytes]:
+                          hint: str = "",
+                          used_image_keys: Optional["UsedImageKeys"] = None) -> Optional[bytes]:
         """Generate an image via Gemini 2.5 Flash Preview native image generation.
         Cheapest custom image generation option — final fallback before giving up."""
         if hint:
@@ -563,7 +710,12 @@ class ImageService:
                 )
                 for part in response.candidates[0].content.parts:
                     if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                        return base64.b64decode(part.inline_data.data)
+                        candidate_bytes = base64.b64decode(part.inline_data.data)
+                        claimed = _claim_unique(candidate_bytes, used_image_keys)
+                        if claimed is None:
+                            # already used in this generation — try next key (new gen)
+                            break
+                        return claimed
                 log.warning("gemini_image_no_image_part", topic=english_topic, station=station)
                 return None
             except Exception as exc:

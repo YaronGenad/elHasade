@@ -9,8 +9,11 @@ WORKDIR /app
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright Chromium + all its system dependencies
-RUN playwright install-deps chromium && playwright install chromium
+# Install Playwright Chromium to a shared path that the non-root runtime user can read.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+RUN playwright install-deps chromium && \
+    playwright install chromium && \
+    chmod -R a+rX /opt/playwright
 
 # Copy the source generation pipeline
 COPY src/ ./src/
