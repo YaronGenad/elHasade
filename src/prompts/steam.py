@@ -1,5 +1,5 @@
 from typing import Any, Dict, List
-from ..config import get_grade_level, get_stem_grade_level, STEAM_GAMES_LIST
+from ..config import get_grade_level, get_stem_grade_level, STEAM_GAMES_LIST, STEAM_HANDS_ON_TYPES
 
 
 def build_stem_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> str:
@@ -379,4 +379,71 @@ def build_stem_vocabulary_prompt(subject: str, topic: str, grade: str,
     "שלב 3: ..."
   ],
   "answer_key": "מפתח תשובות / רשימת ההתאמות הנכונות — למורה"
+}}"""
+
+
+def build_stem_teacher_prep_prompt(subject: str, topic: str, grade: str,
+                                    round_num: int, all_content: Dict) -> str:
+    comp = all_content.get('comprehension', {})
+    meth = all_content.get('methods', {})
+    prec = all_content.get('precision', {})
+    vocab = all_content.get('vocabulary', {})
+
+    hands_on_type = prec.get('hands_on_type', 'science_experiment')
+    type_label = STEAM_HANDS_ON_TYPES.get(hands_on_type, hands_on_type)
+    game_type = vocab.get('game_type', 'stem_memory')
+    materials = prec.get('materials_needed', [])
+    safety = prec.get('safety_notes', [])
+    mat_str = ', '.join(materials[:6]) if materials else 'לפי פרטי התחנה'
+    safety_str = '; '.join(safety) if safety else 'ללא הערות מיוחדות'
+
+    return f"""צור דף הכנה למורה לסבב {round_num} — א"ל השד"ה **גרסת STEAM**.
+
+<user_input>
+מקצוע: {subject} | נושא: {topic} | כיתה: {grade} | סבב {round_num}
+</user_input>
+
+**תחנות הסבב (STEAM Edition):**
+- 🔴 הבנה: {comp.get('section_title', '')} | ערוץ: {comp.get('input_type', 'text')} — תיעוד כתוב קצר מותר
+- 🔵 שיטות: {meth.get('title', '')} | מסגרת: {meth.get('thinking_framework', '')} — **המורה נמצאת כאן**
+- 🟢 דיוק HANDS-ON: {prec.get('title', '')} | סוג: {type_label}
+  ↳ חומרים: {mat_str}
+  ↳ בטיחות: {safety_str}
+- 🟡 אוצר מילים: {vocab.get('title', '')} | משחק: {game_type}
+
+**⚠️ עקרון על — STAND-ALONE:** כל תחנה עצמאית לחלוטין. תחנת הדיוק כוללת הוראות מלאות + רקע מינימלי. אין תלות בין תחנות.
+
+**פורמט פלט — JSON בלבד:**
+{{
+  "objectives": {{
+    "knowledge": ["ידע מדעי/מתמטי/טכנולוגי 1", "ידע 2"],
+    "skills": ["מיומנות חקירה 1", "מיומנות חשיבה תהליכית 2", "מיומנות בנייה/מדידה 3"],
+    "values": ["סקרנות מדעית וחשיבה ביקורתית", "עמידה בפני אי-ודאות ולמידה מטעויות"]
+  }},
+  "steam_connections": ["חיבור STEAM 1 (מדע+מתמטיקה/הנדסה/אמנות)", "חיבור 2"],
+  "materials": {{
+    "comprehension": ["חומר קריאה/סרטון/תצפית — מופיע בתחנה"],
+    "methods": ["דף עבודה מודפס", "נתוני ניסוי (כלולים בדף)"],
+    "precision": {str(materials if materials else ['לפי רשימת תחנת הדיוק'])},
+    "vocabulary": ["קלפי המשחק — להדפסה וגזירה לפני השיעור", "דף הוראות למשחק"]
+  }},
+  "timing": {{
+    "comprehension": "15-20 דקות",
+    "methods": "20-25 דקות",
+    "precision": "20-25 דקות",
+    "vocabulary": "15-20 דקות"
+  }},
+  "safety_checklist": {str(([f"✅ {s}" for s in safety] if safety else ["✅ חומרים בטוחים לגיל", "✅ פיקוח מורה בניסויים"]))},
+  "rotation_tip": "הוראה לסיבוב קבוצות בין 4 תחנות STEAM — כל קבוצה מתחילה בתחנה שונה",
+  "teacher_notes": [
+    "תחנת הבנה: תיעוד כתוב קצר מותר בגרסת STEAM; ודאי שיש KWL + חומר מוכן",
+    "תחנת שיטות: את כאן — נחי תהליך חשיבה; ודאי שנתוני הניסוי כלולים בדף",
+    "תחנת דיוק HANDS-ON: ודאי חומרים מוכנים + הסברי כללי בטיחות בתחילת שיעור",
+    "תחנת אוצר מילים: הדפיסי וגזרי קלפים מראש; ודאי שהמשחק ברור לתלמידים"
+  ],
+  "differentiation": {{
+    "struggling": "הכווינה צמודה בניסוי (שלבים ממוספרים ברורים, עמדת שותף, חצי-ממולאת טבלה)",
+    "advanced": "שאלת הרחבה (שינוי משתנה, ניסוי נוסף עצמאי, הכללה לעולם אמיתי)",
+    "special_needs": "עמדה נגישה, כלים מותאמים, שותף קבוע, טבלה ממוספרת בגדול"
+  }}
 }}"""

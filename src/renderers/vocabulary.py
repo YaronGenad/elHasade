@@ -40,6 +40,179 @@ def _extension_html(ext: dict, english_mode: bool = False) -> str:
 </div>"""
 
 
+def _render_crossword_grid(clues):
+    """Auto-place crossword words on a grid and return a printable HTML table."""
+    if not clues:
+        return ''
+
+    grid = {}       # (row, col) -> letter
+    cell_nums = {}  # (row, col) -> min clue number at this cell (word start)
+    placed = []     # (clue_dict, start_row, start_col, is_across)
+
+    def _is_across(c):
+        return c.get('direction', 'מאוזן') in ('מאוזן', 'across')
+
+    def _cell(row, col, i, ia):
+        return (row, col + i) if ia else (row + i, col)
+
+    def _can_place(word, row, col, ia):
+        pre  = (row, col - 1)        if ia else (row - 1, col)
+        post = (row, col + len(word)) if ia else (row + len(word), col)
+        if pre in grid or post in grid:
+            return False
+        for i, ch in enumerate(word):
+            r, c = _cell(row, col, i, ia)
+            if not (0 <= r <= 25 and 0 <= c <= 25):
+                return False
+            if (r, c) in grid and grid[(r, c)] != ch:
+                return False
+        return True
+
+    def _place(clue, row, col, ia):
+        word = clue['answer'].upper()
+        for i, ch in enumerate(word):
+            r, c = _cell(row, col, i, ia)
+            grid[(r, c)] = ch
+        try:
+            num = int(clue.get('number', 0))
+        except (TypeError, ValueError):
+            num = 0
+        prev = cell_nums.get((row, col), 9999)
+        cell_nums[(row, col)] = min(prev, num)
+        placed.append((clue, row, col, ia))
+
+    # Place first word at center
+    f = clues[0]
+    fia = _is_across(f)
+    fw = f['answer'].upper()
+    if fia:
+        _place(f, 7, max(0, 7 - len(fw) // 2), True)
+    else:
+        _place(f, max(0, 7 - len(fw) // 2), 7, False)
+
+    # Place remaining words by intersecting with already-placed words
+    for clue in clues[1:]:
+        word = clue['answer'].upper()
+        ia = _is_across(clue)
+        done = False
+        for pclue, pr, pcc, pia in placed:
+            if pia == ia:
+                continue
+            pw = pclue['answer'].upper()
+            for i, ch in enumerate(word):
+                for j, pch in enumerate(pw):
+                    if ch != pch:
+                        continue
+                    pr_j, pc_j = _cell(pr, pcc, j, pia)
+                    tr = pr_j if ia else pr_j - i
+                    tc = pc_j - i if ia else pc_j
+                    if _can_place(word, tr, tc, ia):
+                        _place(clue, tr, tc, ia)
+                        done = True
+                        break
+                if done:
+                    break
+            if done:
+                break
+        if not done:
+            for attempt in range(15):
+                tr, tc = (1 + attempt * 2, max(0, 7 - len(word) // 2)) if ia else (max(0, 7 - len(word) // 2), 1 + attempt * 2)
+                if _can_place(word, tr, tc, ia):
+                    _place(clue, tr, tc, ia)
+                    break
+
+    if not grid:
+        return ''
+
+    min_r = min(r for r, _ in grid)
+    max_r = max(r for r, _ in grid)
+    min_c = min(c for _, c in grid)
+    max_c = max(c for _, c in grid)
+
+    html = '<table style="border-collapse:collapse;margin:0 auto;direction:ltr;">'
+    for r in range(min_r, max_r + 1):
+        html += '<tr>'
+        for c in range(min_c, max_c + 1):
+            if (r, c) in grid:
+                n = cell_nums.get((r, c))
+                ns = (f'<span style="position:absolute;top:1px;left:1px;font-size:7px;'
+                      f'font-weight:700;color:#222;line-height:1;">{n}</span>'
+                      ) if n and n < 9999 else ''
+                html += (f'<td style="position:relative;width:24px;height:24px;'
+                         f'border:1.5px solid #444;background:white;padding:0;">{ns}</td>')
+            else:
+                html += '<td style="width:24px;height:24px;background:#2c3e50;border:1px solid #1a252f;padding:0;"></td>'
+        html += '</tr>'
+    html += '</table>'
+    return html
+
+
+def _render_word_search(words, english_mode=False):
+    """Generate and render a printable word search (תשחץ) puzzle."""
+    import random as _rnd
+
+    FILL_LETTERS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ") if english_mode else list("אבגדהוזחטיכלמנסעפצקרשת")
+    GRID_SIZE = 14
+    DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+
+    word_strs = []
+    for w in words:
+        txt = (w.get('word') or '').strip().upper()
+        if 2 <= len(txt) <= GRID_SIZE - 1:
+            word_strs.append(txt)
+    if not word_strs:
+        return ''
+
+    grid = [['.' for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    placed_words = []
+
+    def _try_place(word, r, c, dr, dc):
+        cells = []
+        for i, ch in enumerate(word):
+            nr, nc = r + i * dr, c + i * dc
+            if not (0 <= nr < GRID_SIZE and 0 <= nc < GRID_SIZE):
+                return False
+            if grid[nr][nc] not in ('.', ch):
+                return False
+            cells.append((nr, nc, ch))
+        for nr, nc, ch in cells:
+            grid[nr][nc] = ch
+        return True
+
+    seed = sum(ord(c) for w in word_strs for c in w)
+    rng = _rnd.Random(seed)
+    for word in sorted(word_strs, key=len, reverse=True):
+        attempts = [(r, c, dr, dc) for r in range(GRID_SIZE) for c in range(GRID_SIZE) for dr, dc in DIRECTIONS]
+        rng.shuffle(attempts)
+        for r, c, dr, dc in attempts[:300]:
+            if _try_place(word, r, c, dr, dc):
+                placed_words.append(word)
+                break
+
+    for r in range(GRID_SIZE):
+        for c in range(GRID_SIZE):
+            if grid[r][c] == '.':
+                grid[r][c] = rng.choice(FILL_LETTERS)
+
+    cs = ('width:22px;height:22px;text-align:center;vertical-align:middle;'
+          'border:1px solid #ccc;font-size:13px;font-weight:600;background:white;padding:0;')
+    rows_html = ''.join(
+        '<tr>' + ''.join(f'<td style="{cs}">{ch}</td>' for ch in row) + '</tr>'
+        for row in grid
+    )
+    g_dir = "ltr" if english_mode else "rtl"
+    table_html = f'<table style="border-collapse:collapse;direction:{g_dir};margin:0 auto;">{rows_html}</table>'
+
+    label = "Find the hidden words:" if english_mode else "מצאו את המילים הנסתרות:"
+    ps = ('display:inline-block;background:#f1c40f;padding:3px 10px;margin:3px 2px;'
+          'border-radius:4px;font-weight:700;font-size:12px;')
+    pills = ''.join(f'<span style="{ps}">{w}</span>' for w in placed_words)
+
+    return (f'<div style="overflow-x:auto;text-align:center;">{table_html}</div>'
+            f'<div style="margin-top:12px;"><div class="section-title">{label}</div>'
+            f'<div style="margin-top:6px;">{pills}</div></div>')
+
+
 def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool = False,
                       topic_image: Optional[str] = None,
                       decorative_image: Optional[str] = None) -> str:
@@ -211,22 +384,31 @@ def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool
         ])
         body_html = f"<table>{def_table_headers}{rows}</table>"
 
+    elif activity_type == "word_search":
+        ws_html = _render_word_search(words, english_mode=english_mode)
+        body_html = ws_html if ws_html else f'<div style="text-align:center;color:#888;padding:20px;">{"[Word Search]" if english_mode else "[תשחץ — לא נוצר]"}</div>'
+
     elif activity_type == "crossword_mini":
         clues = data.get('crossword_clues', [])
         across = [c for c in clues if c.get('direction') in ('מאוזן', 'across')]
         down = [c for c in clues if c.get('direction') in ('מאונך', 'down')]
         across_html = "".join([f'<li><strong>{c["number"]}.</strong> {c["clue"]}</li>' for c in across])
         down_html = "".join([f'<li><strong>{c["number"]}.</strong> {c["clue"]}</li>' for c in down])
+        grid_html = _render_crossword_grid(clues)
+        if not grid_html:
+            grid_html = f'<div style="text-align:center;color:#888;padding:20px;">{crossword_placeholder}</div>'
         body_html = f"""
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-            <div>
-                <div class="section-title">{crossword_across}</div>
-                <ol style="font-size:13px; {list_padding}">{across_html}</ol>
-                <div class="section-title" style="margin-top:10px;">{crossword_down}</div>
-                <ol style="font-size:13px; {list_padding}">{down_html}</ol>
-            </div>
-            <div style="background:#fafafa; border:2px solid #f1c40f; border-radius:8px; min-height:200px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#888;">
-                {crossword_placeholder}
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="text-align:center; overflow-x:auto;">{grid_html}</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:8px;">
+                <div>
+                    <div class="section-title">{crossword_across}</div>
+                    <ol style="font-size:13px; {list_padding}">{across_html}</ol>
+                </div>
+                <div>
+                    <div class="section-title">{crossword_down}</div>
+                    <ol style="font-size:13px; {list_padding}">{down_html}</ol>
+                </div>
             </div>
         </div>
         """

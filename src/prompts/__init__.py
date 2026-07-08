@@ -20,6 +20,7 @@ from .steam import (
     build_stem_methods_prompt,
     build_stem_precision_prompt,
     build_stem_vocabulary_prompt,
+    build_stem_teacher_prep_prompt,
 )
 from .english import (
     build_english_roadmap_prompt,
@@ -42,6 +43,7 @@ __all__ = [
     "build_stem_methods_prompt",
     "build_stem_precision_prompt",
     "build_stem_vocabulary_prompt",
+    "build_stem_teacher_prep_prompt",
     "build_english_roadmap_prompt",
     "build_english_comprehension_prompt",
     "build_english_methods_prompt",

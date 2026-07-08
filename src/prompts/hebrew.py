@@ -33,13 +33,15 @@ def build_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> s
 6. תחנת הבנה: חייב להתחיל עם טקסט סיפורי, לא לחזור על אותו טקסט בסבבים
 7. שלב ב-STEAM: שלב רב-תחומיות אמיתית (מדע/טכנולוגיה/אמנות/מתמטיקה) איפה שמתאים
 8. הפעילויות מתקדמות מסבב לסבב: מבוא → העמקה → שיא
+9. **תחנת דיוק — גיוון חובה:** כל סבב חייב להשתמש ב-activity_type שונה לחלוטין. אסור לחזור על אותו סוג פעילות בשני סבבים. הכתבה היא רק בסבב 1 — בסבבים 2-4 בחר שורשים/בניינים/מאזכרים/זמנים/גופים/הומופוניות/רצף משפטים.
+10. **תחנת אוצר מילים — גיוון חובה:** כל סבב חייב להשתמש ב-activity_type שונה. לפחות סבב אחד פיזי (physical_*) ולפחות סבב אחד עם תשבץ (crossword_mini) או תשחץ (word_search).
 
 **סוגי כתיבה לתחנת שיטות (בחר לפי גיל וסבב):**
 טיעון (בעד/נגד), תיאור (דמות/מקום/אירוע), תשובה מיטבית, סיכום, מיזוג, חוות דעת,
 דוח (ניסוי/חקר/תצפית), מכתב (א-ב), שיר קצר (א-ב), יומן אישי (ג ומעלה), ניתוח טקסט מידעי (ה-ו), תרשים זרימה
 
 **סוגי פעילות לתחנת אוצר מילים:**
-מודפסות: matching_cards, sorting_table, dominoes, fill_in_poster, clothesline, idiom_cards, definition_table, crossword_mini
+מודפסות: matching_cards, sorting_table, dominoes, fill_in_poster, clothesline, idiom_cards, definition_table, crossword_mini, word_search
 פיזיות/חווייתיות: physical_plasticine (פיסול מילה), physical_model (בניית מודל), physical_game (משחק קלפים/התאמה), physical_poster (כרזה/תערוכה), physical_simulation (משחק תפקידים/סימולציה)
 
 **אפשרויות לפי גיל {gl['age']}:**
@@ -71,8 +73,8 @@ def build_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> s
         "description": "תיאור המשימה"
       }},
       "precision": {{
-        "activity_type": "הכתבה/שורשים/בניינים/מאזכרים/זמנים/גופים/הומופוניות/רצף משפטים",
-        "description": "תיאור"
+        "activity_type": "בחר בדיוק אחד (שונה מכל הסבבים האחרים): שורשים | בניינים | מאזכרים | זמנים | גופים | הומופוניות | רצף_משפטים | הכתבה",
+        "description": "תיאור קצר של הפעילות הנבחרת"
       }},
       "vocabulary": {{
         "activity_type": "סוג הפעילות (מודפסת או פיזית)",
@@ -320,7 +322,8 @@ def build_vocabulary_prompt(subject: str, topic: str, grade: str,
 - clothesline: חיבור זוגות עם קו (נרדפות/הפכים)
 - idiom_cards: קלפי ביטויים + פירוש
 - definition_table: מילה | הגדרה | משפט
-- crossword_mini: תשבץ מיני
+- crossword_mini: תשבץ מיני — רשת עם רמזים מאוזן/מאונך
+- word_search: תשחץ מילים — מצא מילים נסתרות ברשת אותיות
 
 **סוגי פעילויות פיזיות/חווייתיות:**
 - physical_plasticine: פיסול מילה/מושג בפלסטלינה/בצק — כולל הוראות + רשימת מילים לפיסול

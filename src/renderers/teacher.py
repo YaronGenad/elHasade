@@ -60,7 +60,7 @@ def render_teacher_prep(title: str, round_num: int, data: Dict, content: Dict,
     mat_html = ""
     for station, mat_list in materials.items():
         c = STATION_COLORS.get(station, STATION_COLORS['teacher'])
-        items = "".join([f'<li>{m}</li>' for m in mat_list])
+        items = "".join([f'<li>{m}</li>' for m in (mat_list if isinstance(mat_list, list) else [str(mat_list)])])
         sname = station_name_fn(station)
         mat_html += f"<div style='margin-bottom:8px;'><strong style='color:{c['primary']};'>{c['emoji']} {sname}:</strong><ul style='margin:3px 0; {list_pad}'>{items}</ul></div>"
 
@@ -70,6 +70,31 @@ def render_teacher_prep(title: str, round_num: int, data: Dict, content: Dict,
         f'<span style="color:#666;">{v}</span></div>'
         for k, v in timing.items()
     ])
+
+    # STEAM-only extra sections
+    safety_checklist = data.get('safety_checklist', [])
+    steam_connections = data.get('steam_connections', [])
+    rotation_tip = data.get('rotation_tip', '')
+
+    safety_html = ""
+    if safety_checklist and not english_mode:
+        items = "".join([f'<li style="margin-bottom:3px;">{s}</li>' for s in safety_checklist])
+        safety_html = f"""
+<div style="background:#fdebd0; border:1.5px solid #e67e22; border-radius:8px; padding:12px; margin-bottom:14px;">
+    <div style="font-weight:800; color:#935116; margin-bottom:8px;">⚠️ רשימת ביטחון לניסוי/פעילות HANDS-ON</div>
+    <ul style="font-size:12px; {list_pad}">{items}</ul>
+</div>"""
+
+    steam_html = ""
+    if (steam_connections or rotation_tip) and not english_mode:
+        conn_items = "".join([f'<li style="margin-bottom:3px;">{c}</li>' for c in steam_connections])
+        rot_div = f'<div style="margin-top:8px; font-size:12px; color:#555;"><strong>🔄 סיבוב קבוצות:</strong> {rotation_tip}</div>' if rotation_tip else ''
+        steam_html = f"""
+<div style="background:#eaf4fb; border:1.5px solid #2980b9; border-radius:8px; padding:12px; margin-bottom:14px;">
+    <div style="font-weight:800; color:#1a5276; margin-bottom:8px;">🔬 חיבורי STEAM ורב-תחומיות</div>
+    <ul style="font-size:12px; {list_pad}">{conn_items}</ul>
+    {rot_div}
+</div>"""
 
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
@@ -101,7 +126,8 @@ def render_teacher_prep(title: str, round_num: int, data: Dict, content: Dict,
     <div style="font-weight:800; color:#1e8449; margin-bottom:8px;">{materials_title}</div>
     <div style="font-size:12px;">{mat_html}</div>
 </div>
-
+{safety_html}
+{steam_html}
 <div style="background:#fef9e7; border:1.5px solid #f1c40f; border-radius:8px; padding:12px; margin-bottom:14px;">
     <div style="font-weight:800; color:#7d6608; margin-bottom:8px;">{notes_title}</div>
     <ul style="font-size:12px; {notes_pad}">{list_html(notes)}</ul>

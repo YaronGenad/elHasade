@@ -51,44 +51,46 @@ def get_css(station: str = "comprehension") -> str:
     @page {{ size: A4; margin: 10mm; }}
     * {{ box-sizing: border-box; }}
     body {{
-        font-family: Arial, 'Arial Hebrew', sans-serif;
+        font-family: 'Arial Hebrew', Arial, 'Segoe UI', sans-serif;
         direction: rtl;
-        line-height: 1.8;
-        color: #2c3e50;
+        line-height: 1.9;
+        color: #1e2a3a;
         background: white;
-        font-size: 13px;
+        font-size: 13.5px;
         margin: 0;
         padding: 0 0 4mm;
     }}
-    /* Fixed colored border — sits at paper edge, @page margin keeps content inside */
+    /* Thin elegant frame — 3.5mm instead of 10mm */
     .page-frame-border {{
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
-        border: 10mm solid {c['primary']};
-        border-radius: 4mm;
+        border: 3.5mm solid {c['primary']};
         pointer-events: none;
         z-index: 100;
     }}
+    /* Station header — gradient bar stretching edge-to-edge within the margin */
     .page-header {{
-        background: linear-gradient(135deg, {c['primary']}, {c['border']});
+        background: linear-gradient(110deg, {c['primary']} 0%, {c['border']} 100%);
         color: white;
-        padding: 14px 18px;
+        padding: 13px 20px;
         border-radius: 0;
         margin: 0 0 16px;
         direction: ltr;
         display: flex;
         flex-direction: row;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.18);
     }}
     .header-icon-circle {{
-        width: 64px; height: 64px;
-        background: rgba(255,255,255,0.22);
+        width: 58px; height: 58px;
+        background: rgba(255,255,255,0.2);
+        border: 2px solid rgba(255,255,255,0.45);
         border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         flex-shrink: 0;
     }}
-    .header-icon-circle svg {{ width: 36px; height: 36px; display: block; }}
+    .header-icon-circle svg {{ width: 32px; height: 32px; display: block; }}
     .header-center {{
         flex: 1;
         text-align: center;
@@ -96,38 +98,41 @@ def get_css(station: str = "comprehension") -> str:
     }}
     .header-round-badge {{
         display: inline-block;
-        background: rgba(255,255,255,0.25);
-        border: 1.5px solid rgba(255,255,255,0.6);
+        background: rgba(255,255,255,0.22);
+        border: 1.5px solid rgba(255,255,255,0.55);
         border-radius: 20px;
-        padding: 3px 16px;
-        font-size: 13px;
+        padding: 3px 18px;
+        font-size: 12.5px;
         font-weight: 700;
         color: white;
-        margin-bottom: 4px;
+        margin-bottom: 5px;
+        letter-spacing: 0.3px;
     }}
     .header-station-name {{
-        font-size: 22px;
+        font-size: 21px;
         font-weight: 800;
         color: white;
+        letter-spacing: 0.5px;
     }}
     .header-logo-img {{
-        width: 64px; height: 64px;
+        width: 58px; height: 58px;
         border-radius: 50%;
         object-fit: cover;
         flex-shrink: 0;
-        border: 2px solid rgba(255,255,255,0.4);
+        border: 2.5px solid rgba(255,255,255,0.5);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
     }}
-    /* legacy classes kept for backward compat */
+    /* legacy classes */
     .header-left {{ display: flex; align-items: center; gap: 12px; }}
     .header-icon {{
         width: 44px; height: 44px;
-        background: rgba(255,255,255,0.25);
-        border-radius: 8px;
+        background: rgba(255,255,255,0.22);
+        border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         font-size: 22px;
     }}
     .header-title {{ font-size: 18px; font-weight: 800; }}
-    .header-subtitle {{ font-size: 12px; opacity: 0.9; }}
+    .header-subtitle {{ font-size: 12px; opacity: 0.85; }}
     .header-badge {{
         background: rgba(255,255,255,0.2);
         border: 1.5px solid rgba(255,255,255,0.5);
@@ -136,78 +141,93 @@ def get_css(station: str = "comprehension") -> str:
         font-size: 13px;
         font-weight: 700;
     }}
+    /* Student fields */
     .student-bar {{
-        display: flex; gap: 16px;
+        display: flex; gap: 18px;
         margin-bottom: 14px;
         font-size: 12px;
+        background: #f8f9fc;
+        border-radius: 8px;
+        padding: 8px 14px;
+        border: 1px solid #e8ecf2;
     }}
     .student-field {{
-        display: flex; align-items: center; gap: 5px; flex: 1;
+        display: flex; align-items: center; gap: 6px; flex: 1;
     }}
-    .student-field label {{ font-weight: 700; color: #555; white-space: nowrap; }}
+    .student-field label {{ font-weight: 700; color: #4a5568; white-space: nowrap; }}
     .student-line {{
-        flex: 1; border-bottom: 1.5px solid #aaa; min-width: 60px; height: 18px;
+        flex: 1; border-bottom: 2px solid {c['border']}; min-width: 60px; height: 18px;
     }}
+    /* Instruction box */
     .instruction-box {{
-        background: {c['light']};
-        border: 2px solid {c['border']};
-        border-radius: 8px;
+        background: linear-gradient(135deg, {c['light']}, white);
+        border-right: 4px solid {c['primary']};
+        border-radius: 0 8px 8px 0;
         padding: 10px 14px;
         margin-bottom: 14px;
-        font-size: 13px;
+        font-size: 13.5px;
         font-weight: 600;
         color: {c['primary']};
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     }}
+    /* Section titles — cleaner accent style */
     .section-title {{
-        background: {c['primary']};
-        color: white;
-        padding: 6px 14px;
-        border-radius: 6px;
+        background: {c['light']};
+        color: {c['primary']};
+        border-right: 5px solid {c['primary']};
+        padding: 7px 12px 7px 10px;
+        border-radius: 0 6px 6px 0;
         font-size: 14px;
-        font-weight: 700;
-        margin: 14px 0 10px 0;
+        font-weight: 800;
+        margin: 16px 0 10px 0;
         display: inline-block;
         page-break-after: avoid;
+        letter-spacing: 0.2px;
     }}
     .section-block {{
         page-break-inside: avoid;
     }}
+    /* Writing lines */
     .answer-line {{
-        border-bottom: 1.5px solid #bbb;
-        height: 22px; width: 100%; margin-bottom: 6px;
+        border-bottom: 1.5px solid #c8d0da;
+        height: 24px; width: 100%; margin-bottom: 5px;
     }}
     .writing-box {{
         border: 1.5px solid {c['border']};
-        border-radius: 8px;
-        padding: 10px;
+        border-radius: 10px;
+        padding: 12px;
         min-height: 120px;
-        background: #fafafa;
+        background: #fafbfd;
         margin-top: 8px;
         page-break-inside: avoid;
+        box-shadow: inset 0 1px 4px rgba(0,0,0,0.04);
     }}
     .writing-line {{
-        border-bottom: 1px solid #ccc;
-        height: 24px; width: 100%; margin-bottom: 2px;
+        border-bottom: 1px solid #dde3ec;
+        height: 26px; width: 100%; margin-bottom: 2px;
     }}
-    table {{ width: 100%; border-collapse: collapse; margin-top: 10px; page-break-inside: avoid; }}
-    th {{ background: {c['primary']}; color: white; padding: 8px 10px; font-size: 13px; }}
-    td {{ border: 1px solid #ddd; padding: 7px 10px; font-size: 12.5px; }}
+    /* Tables */
+    table {{ width: 100%; border-collapse: collapse; margin-top: 10px; page-break-inside: avoid; border-radius: 8px; overflow: hidden; }}
+    th {{ background: {c['primary']}; color: white; padding: 9px 12px; font-size: 13px; font-weight: 700; }}
+    td {{ border: 1px solid #e0e6ee; padding: 8px 11px; font-size: 12.5px; }}
     tr:nth-child(even) td {{ background: {c['light']}; }}
+    tr:hover td {{ background: rgba(0,0,0,0.02); }}
+    /* Word bank */
     .word-bank {{
-        background: #fffde7;
-        border: 1.5px dashed #f39c12;
-        border-radius: 8px;
-        padding: 8px 12px;
+        background: #fffbf0;
+        border: 1.5px dashed #e6a817;
+        border-radius: 10px;
+        padding: 9px 14px;
         margin-bottom: 12px;
-        font-size: 12px;
+        font-size: 12.5px;
     }}
     .word-pill {{
         display: inline-block;
         background: {c['light']};
         border: 1.5px solid {c['border']};
         color: {c['primary']};
-        padding: 2px 12px;
-        border-radius: 14px;
+        padding: 3px 13px;
+        border-radius: 16px;
         margin: 2px 3px;
         font-size: 12px;
         font-weight: 700;
@@ -216,20 +236,21 @@ def get_css(station: str = "comprehension") -> str:
         font-weight: 700;
         color: {c['primary']};
         background: {c['light']};
-        padding: 1px 4px;
-        border-radius: 3px;
+        padding: 1px 5px;
+        border-radius: 4px;
     }}
+    /* Card grids */
     .cards-grid {{
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
+        gap: 9px;
         margin-top: 10px;
     }}
     .cut-card {{
-        border: 2.5px dashed {c['border']};
-        border-radius: 8px;
-        padding: 10px;
-        min-height: 70px;
+        border: 2px dashed {c['border']};
+        border-radius: 10px;
+        padding: 11px;
+        min-height: 72px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -248,20 +269,21 @@ def get_css(station: str = "comprehension") -> str:
         background: white;
     }}
     .scissors-hint {{
-        font-size: 11px; color: #888; margin-top: 6px;
+        font-size: 11px; color: #9aa; margin-top: 6px;
         text-align: center; font-style: italic;
     }}
+    /* Match exercises */
     .match-container {{
         display: grid;
-        grid-template-columns: 1fr 40px 1fr;
+        grid-template-columns: 1fr 36px 1fr;
         gap: 6px;
         align-items: center;
-        margin-bottom: 6px;
+        margin-bottom: 7px;
     }}
     .match-left {{
         background: {c['light']};
         border: 2px solid {c['border']};
-        border-radius: 6px;
+        border-radius: 7px;
         padding: 7px 10px;
         font-weight: 700;
         font-size: 12px;
@@ -270,8 +292,8 @@ def get_css(station: str = "comprehension") -> str:
     }}
     .match-right {{
         background: white;
-        border: 2px solid #bbb;
-        border-radius: 6px;
+        border: 2px solid #d0d8e4;
+        border-radius: 7px;
         padding: 7px 10px;
         font-size: 11.5px;
         text-align: center;
@@ -280,8 +302,9 @@ def get_css(station: str = "comprehension") -> str:
     .match-line-area {{
         text-align: center;
         font-size: 18px;
-        color: #ccc;
+        color: #bbb;
     }}
+    /* Sort boxes */
     .sort-categories {{
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -289,63 +312,68 @@ def get_css(station: str = "comprehension") -> str:
         margin-top: 12px;
     }}
     .sort-box {{
-        border: 2.5px solid {c['border']};
-        border-radius: 8px;
+        border: 2px solid {c['border']};
+        border-radius: 10px;
         min-height: 100px;
-        padding: 8px;
+        padding: 9px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     }}
     .sort-box-title {{
         background: {c['primary']};
         color: white;
-        border-radius: 5px;
-        padding: 4px 8px;
+        border-radius: 6px;
+        padding: 5px 9px;
         font-size: 12px;
         font-weight: 700;
         text-align: center;
-        margin-bottom: 8px;
+        margin-bottom: 9px;
     }}
+    /* Difficulty levels */
     .traffic-light {{
         display: flex; gap: 8px; margin: 10px 0;
         page-break-inside: avoid;
     }}
-    .tl-green {{ background: #d5f5e3; border: 1.5px solid #27ae60; border-radius: 6px; padding: 6px 10px; font-size: 12px; flex: 1; }}
-    .tl-yellow {{ background: #fef9e7; border: 1.5px solid #f1c40f; border-radius: 6px; padding: 6px 10px; font-size: 12px; flex: 1; }}
-    .tl-red {{ background: #fadbd8; border: 1.5px solid #e74c3c; border-radius: 6px; padding: 6px 10px; font-size: 12px; flex: 1; }}
-    .tl-label {{ font-size: 10px; font-weight: 700; margin-bottom: 3px; }}
-    /* Fixed footer — sits within the @page margin area at paper bottom */
+    .tl-green {{ background: #e8f8f0; border: 1.5px solid #27ae60; border-radius: 8px; padding: 8px 10px; font-size: 12px; flex: 1; }}
+    .tl-yellow {{ background: #fefce8; border: 1.5px solid #f1c40f; border-radius: 8px; padding: 8px 10px; font-size: 12px; flex: 1; }}
+    .tl-red {{ background: #fef0ee; border: 1.5px solid #e74c3c; border-radius: 8px; padding: 8px 10px; font-size: 12px; flex: 1; }}
+    .tl-label {{ font-size: 10.5px; font-weight: 800; margin-bottom: 4px; }}
+    /* Footer */
     .page-footer {{
         position: fixed;
         bottom: 2mm;
         left: 0; right: 0;
         text-align: center;
-        font-size: 10px;
-        color: #888;
+        font-size: 9.5px;
+        color: #a0aab8;
         padding-top: 4px;
         background: transparent;
         z-index: 200;
+        letter-spacing: 0.3px;
     }}
     .page-break {{ page-break-before: always; }}
+    /* Physical activity badge */
     .physical-badge {{
         background: linear-gradient(135deg, #e74c3c, #c0392b);
         color: white;
-        padding: 6px 16px;
+        padding: 6px 18px;
         border-radius: 20px;
         font-size: 12px;
         font-weight: 700;
         display: inline-block;
         margin-bottom: 12px;
+        box-shadow: 0 2px 6px rgba(231,76,60,0.35);
     }}
     .materials-box {{
-        background: #fef9e7;
-        border: 2px dashed #f39c12;
-        border-radius: 8px;
+        background: #fffbf0;
+        border: 1.5px dashed #e6a817;
+        border-radius: 10px;
         padding: 10px 14px;
         margin-bottom: 14px;
     }}
     .materials-box-title {{
         font-weight: 700;
         font-size: 13px;
-        color: #e67e22;
+        color: #d4870a;
         margin-bottom: 6px;
     }}
     .materials-list {{
@@ -355,16 +383,16 @@ def get_css(station: str = "comprehension") -> str:
     }}
     .materials-list li {{
         background: white;
-        border: 1.5px solid #f39c12;
-        border-radius: 6px;
-        padding: 3px 10px;
+        border: 1.5px solid #e6a817;
+        border-radius: 7px;
+        padding: 4px 11px;
         font-size: 12px;
         color: #555;
     }}
     .steps-box {{
-        background: #f8f9fa;
-        border: 2px solid {c['border']};
-        border-radius: 8px;
+        background: #f7f9fc;
+        border: 1.5px solid {c['border']};
+        border-radius: 10px;
         padding: 12px 16px;
         margin-bottom: 14px;
         page-break-inside: avoid;
@@ -385,7 +413,7 @@ def get_css(station: str = "comprehension") -> str:
         display: flex;
         align-items: flex-start;
         gap: 10px;
-        margin-bottom: 8px;
+        margin-bottom: 9px;
         font-size: 13px;
     }}
     .steps-list li::before {{
@@ -393,25 +421,27 @@ def get_css(station: str = "comprehension") -> str:
         background: {c['primary']};
         color: white;
         border-radius: 50%;
-        min-width: 22px;
-        height: 22px;
+        min-width: 24px;
+        height: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 11px;
-        font-weight: 700;
+        font-weight: 800;
         flex-shrink: 0;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
     }}
+    /* Word cards for cut-out activity */
     .word-cards-print {{
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
+        gap: 9px;
         margin-top: 10px;
     }}
     .word-card-print {{
-        border: 2.5px dashed {c['border']};
-        border-radius: 8px;
-        padding: 10px 8px;
+        border: 2px dashed {c['border']};
+        border-radius: 10px;
+        padding: 11px 9px;
         text-align: center;
         background: {c['light']};
         page-break-inside: avoid;
@@ -420,13 +450,13 @@ def get_css(station: str = "comprehension") -> str:
         font-weight: 800;
         font-size: 14px;
         color: {c['primary']};
-        margin-bottom: 4px;
+        margin-bottom: 5px;
     }}
     .word-card-def {{
         font-size: 10.5px;
         color: #666;
         border-top: 1px dashed #ccc;
-        padding-top: 4px;
+        padding-top: 5px;
         margin-top: 4px;
     }}
     """

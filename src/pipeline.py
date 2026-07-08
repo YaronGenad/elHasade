@@ -29,6 +29,7 @@ from .prompts import (
     build_stem_methods_prompt,
     build_stem_precision_prompt,
     build_stem_vocabulary_prompt,
+    build_stem_teacher_prep_prompt,
     # English edition
     build_english_roadmap_prompt,
     build_english_comprehension_prompt,
@@ -171,20 +172,19 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
             "vocabulary":    _img.fetch(topic, grade, "vocabulary", round_num, used_image_keys=used_image_keys),
         }
         svg_images = {
-            "comprehension": _img.generate_svg_illustration(topic, "comprehension", round_num, used_image_keys=used_image_keys),
-            "methods":       _img.generate_svg_illustration(topic, "methods", round_num, used_image_keys=used_image_keys),
-            "precision":     _img.generate_svg_illustration(topic, "precision", round_num, used_image_keys=used_image_keys),
-            "vocabulary":    _img.generate_svg_illustration(topic, "vocabulary", round_num, used_image_keys=used_image_keys),
+            "comprehension": None,
+            "methods":       None,
+            "precision":     None,
+            "vocabulary":    None,
         }
         decorative_images = {
-            "comprehension": _img.fetch_decorative(topic, "comprehension", round_num, used_image_keys=used_image_keys),
-            "precision":   _img.fetch_decorative(topic, "precision", round_num, used_image_keys=used_image_keys),
-            "vocabulary":  _img.fetch_decorative(topic, "vocabulary", round_num, used_image_keys=used_image_keys),
+            "comprehension": None,
+            "precision":     None,
+            "vocabulary":    None,
         }
-        # Small decorative SVG rows for filling whitespace in comprehension & methods
         extra_svgs_map = {
-            "comprehension": _img.generate_mini_svgs(topic, "comprehension", round_num, count=2, used_image_keys=used_image_keys),
-            "methods":       _img.generate_mini_svgs(topic, "methods", round_num, count=1, used_image_keys=used_image_keys),
+            "comprehension": [],
+            "methods":       [],
         }
 
         log.info("images_fetched",
@@ -294,7 +294,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
                         english_mode=english_mode, topic_image=topic_images["comprehension"],
                         svg_decorative=svg_images.get("comprehension"),
                         extra_svgs=extra_svgs_map.get("comprehension", []),
-                        decorative_image=decorative_images.get("comprehension"))
+                        decorative_image=topic_images.get("comprehension"))
     comp_path = f"{output_dir}/{safe_name}_round{round_num}_comprehension.html"
     _save(comp_html, comp_path, "comprehension")
     files['comprehension'] = comp_path
@@ -384,7 +384,12 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
 
     # Teacher Prep
     log.info("station_start", station="teacher_prep", round=round_num)
-    teacher_prep_fn = build_english_teacher_prep_prompt if english_mode else build_teacher_prep_prompt
+    if steam_mode:
+        teacher_prep_fn = build_stem_teacher_prep_prompt
+    elif english_mode:
+        teacher_prep_fn = build_english_teacher_prep_prompt
+    else:
+        teacher_prep_fn = build_teacher_prep_prompt
     teacher_data = _call_llm(teacher_prep_fn(subject, topic, grade, round_num, content), "teacher_prep")
     content['teacher'] = teacher_data
     teacher_html = _render("teacher_prep", render_teacher_prep, topic, round_num, teacher_data,

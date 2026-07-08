@@ -61,7 +61,7 @@ GRADE_LEVELS = {
         "comprehension_options": ["קוביית ממים ומידעית", "שאלות ערכים ודילמות", "המחזה של טקסט"],
         "methods_options": ["כתיבת טיעון בעד/נגד", "תיאור דמות", "חוות דעת על אירוע", "כתיבת דוח", "תרשים זרימה"],
         "precision_options": ["הכתבות 15-20 מילים", "הכתבת משפטים", "אפיון דמות", "ביטויים ומשמעותם", "מאזכרים", "פאזל מילים נרדפות"],
-        "vocabulary_options": ["קלפי ביטויים ופירושים לגזירה", "בניית כרזות", "משחקי מילים מורכבים (קלפים לגזירה)", "פאזל מילים נרדפות"]
+        "vocabulary_options": ["קלפי ביטויים ופירושים לגזירה", "בניית כרזות", "משחקי מילים מורכבים (קלפים לגזירה)", "פאזל מילים נרדפות", "תשחץ מילים (word_search)", "תשבץ מיני (crossword_mini)"]
     },
     "ז-ח": {
         "age": "12-14",
@@ -72,7 +72,7 @@ GRADE_LEVELS = {
         "comprehension_options": ["שאלות ניתוח וביקורת", "דיון על ערכים ודילמות", "קוביית ממים מתקדמת"],
         "methods_options": ["כתיבת טיעון מנומק", "ניתוח טקסט לפי תבחינים", "כתיבת סיכום", "תשובה מיטבית"],
         "precision_options": ["הכתבות 18-20 מילים", "שורשים ובניינים", "סוגי משפטים", "מאזכרים מתקדמים"],
-        "vocabulary_options": ["טבלת מילים-הגדרות-משפטים", "כרזות ביטויים מורכבים", "קלפי נרדפות/הפכים לגזירה"]
+        "vocabulary_options": ["טבלת מילים-הגדרות-משפטים", "כרזות ביטויים מורכבים", "קלפי נרדפות/הפכים לגזירה", "תשחץ מילים (word_search)", "תשבץ מיני (crossword_mini)"]
     },
     "ט-י": {
         "age": "14-16",
@@ -140,10 +140,28 @@ def needs_nikud(grade: str) -> bool:
 # ─── STEM / STEAM ───────────────────────────────────────────────────────────
 
 STEM_SUBJECTS = {
-    "מתמטיקה", "מדעים", "טכנולוגיה", "הנדסה",
-    "אמנויות", "מד' וטכ'", "פיזיקה", "כימיה", "ביולוגיה",
-    "חשמל", "מחשבים", "סביבה", "גיאוגרפיה",
-    "math", "science", "technology", "engineering", "arts",
+    # Core STEAM subjects (Hebrew)
+    "מתמטיקה", "מדעים", "מדע", "טכנולוגיה", "הנדסה", "אמנויות", "אמנות",
+    # Specific sciences
+    "פיזיקה", "כימיה", "ביולוגיה", "גיאוגרפיה", "גיאולוגיה", "אסטרונומיה",
+    # Technology / Computers
+    "חשמל", "אלקטרוניקה", "מחשבים", "מחשב", "תכנות", "קוד", "רובוטיקה",
+    # Common Israeli curriculum names
+    "מד' וטכ'", "מד וטכ", "מדע וטכ", "מדע וטבע",
+    "מדעי הטבע", "מדעי הסביבה", "מדעי האדמה",
+    "חינוך טכנולוגי", "טכנולוגיה ועיצוב",
+    # Arts in STEAM
+    "מוזיקה", "תיאטרון", "עיצוב", "אדריכלות",
+    # English names
+    "math", "mathematics", "science", "technology", "engineering", "arts",
+    "physics", "chemistry", "biology", "computer", "coding", "robotics",
+    "geography", "geology", "astronomy",
+}
+
+# Subjects that sound like STEM but are NOT (explicit exclusions prevent false positives)
+_NON_STEM_SUBJECTS = {
+    "מדעי החברה", "מדעי הדתות", "מדעי הדת", "מדעי המדינה",
+    "סביבה חברתית", "חברה",
 }
 
 ENGLISH_SUBJECTS = {
@@ -153,6 +171,9 @@ ENGLISH_SUBJECTS = {
 
 def is_stem(subject: str) -> bool:
     """Returns True when the subject calls for the STEAM edition of א\"ל השד\"ה."""
+    # Explicit non-STEM check first (social sciences, etc.)
+    if any(ns in subject for ns in _NON_STEM_SUBJECTS):
+        return False
     return any(s in subject for s in STEM_SUBJECTS)
 
 
@@ -391,6 +412,14 @@ STEM_GRADE_ADAPTATIONS = {
             "Quiz Bowl אקדמי",
         ],
     },
+}
+
+STEAM_HANDS_ON_TYPES = {
+    'science_experiment': 'ניסוי מדעי',
+    'measurement_data':   'מדידות ואיסוף נתונים',
+    'engineering_building': 'בנייה הנדסית',
+    'math_hands_on':      'מתמטיקה מוחשית',
+    'art_design':         'יצירה ועיצוב',
 }
 
 STEAM_GAMES_LIST = """רשימת 17 המשחקים לתחנת הרחבת אוצר מילים — גרסת STEAM:
