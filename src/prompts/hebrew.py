@@ -1,5 +1,32 @@
 from typing import Any, Dict, List
-from ..config import get_grade_level, needs_nikud
+from ..config import get_grade_level, get_curriculum_profile, needs_nikud
+
+
+def _curriculum_block(subject: str, grade: str) -> str:
+    """Return a <curriculum_context> block for prompt injection, or empty string."""
+    cp = get_curriculum_profile(grade, subject)
+    if not cp:
+        return ""
+    concepts = ", ".join(cp.get("key_concepts", [])[:6])
+    topics = ", ".join(cp.get("typical_authentic_topics", [])[:4])
+    avoid = cp.get("avoid_in_content", "")
+    prior = cp.get("expected_prior_knowledge", "")
+    vocab = cp.get("vocabulary_profile", "")
+    parts = []
+    if concepts:
+        parts.append(f"מושגי מפתח בתכנית הלימודים לגיל זה: {concepts}")
+    if prior:
+        parts.append(f"ידע קודם מוכר לתלמיד: {prior}")
+    if vocab:
+        parts.append(f"פרופיל אוצר מילים: {vocab}")
+    if topics:
+        parts.append(f"נושאים אותנטיים מהתכנית הרשמית: {topics}")
+    if avoid:
+        parts.append(f"יש להימנע מ: {avoid}")
+    if not parts:
+        return ""
+    body = "\n".join(f"• {p}" for p in parts)
+    return f"\n<curriculum_context>\n{body}\n</curriculum_context>\n"
 
 
 def _nikud_note(grade: str) -> str:
@@ -16,6 +43,7 @@ def _nikud_note(grade: str) -> str:
 
 def build_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> str:
     gl = get_grade_level(grade)
+    curr = _curriculum_block(subject, grade)
     return f"""אתה מתכנן יחידת לימוד בשיטת א"ל השד"ה (הבנה, שיטות, דיוק, הרחבת אוצר מילים).
 
 <user_input>
@@ -23,6 +51,7 @@ def build_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> s
 כיתה: {grade} | גיל: {gl['age']} | רמת שפה: {gl['language']}
 מספר סבבים: {rounds}
 </user_input>
+{curr}
 
 **חוקי ברזל:**
 1. כל 4 תחנות בכל סבב — **עצמאיות לחלוטין** (תלמיד יכול להתחיל בכל אחת)
@@ -98,6 +127,7 @@ def build_comprehension_prompt(subject: str, topic: str, grade: str,
     text_desc = round_plan.get('comprehension', {}).get('description', '')
     disc_focus = round_plan.get('comprehension', {}).get('discussion_focus', 'קונפליקט ודילמה')
 
+    curr = _curriculum_block(subject, grade)
     return f"""כתוב טקסט לתחנת ההבנה בשיטת א"ל השד"ה.{_nikud_note(grade)}
 <user_input>
 נושא: {subject} — {topic}
@@ -105,7 +135,7 @@ def build_comprehension_prompt(subject: str, topic: str, grade: str,
 סבב {round_num} מתוך {total_rounds} | סוג טקסט: {text_type} | תכנון: {text_desc}
 מוקד הדיון: {disc_focus}{prev}
 </user_input>
-
+{curr}
 **אפשרויות פעילות לתחנת הבנה לגיל זה:** {', '.join(gl['comprehension_options'])}
 
 **⚠️ חוקים קריטיים:**

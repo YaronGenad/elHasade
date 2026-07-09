@@ -1,16 +1,39 @@
 from typing import Any, Dict, List
-from ..config import get_grade_level, get_stem_grade_level, STEAM_GAMES_LIST, STEAM_HANDS_ON_TYPES
+from ..config import get_grade_level, get_stem_grade_level, get_curriculum_profile, STEAM_GAMES_LIST, STEAM_HANDS_ON_TYPES
+
+
+def _steam_curriculum_block(subject: str, grade: str) -> str:
+    """Curriculum context for STEAM prompts."""
+    cp = get_curriculum_profile(grade, subject)
+    if not cp:
+        return ""
+    concepts = ", ".join(cp.get("key_concepts", [])[:5])
+    prior = cp.get("expected_prior_knowledge", "")
+    avoid = cp.get("avoid_in_content", "")
+    parts = []
+    if concepts:
+        parts.append(f"מושגי מפתח בתכנית הלימודים לגיל זה: {concepts}")
+    if prior:
+        parts.append(f"ידע קודם מוכר לתלמיד: {prior}")
+    if avoid:
+        parts.append(f"יש להימנע מ: {avoid}")
+    if not parts:
+        return ""
+    body = "\n".join(f"• {p}" for p in parts)
+    return f"\n<curriculum_context>\n{body}\n</curriculum_context>\n"
 
 
 def build_stem_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> str:
     gl = get_grade_level(grade)
     sgl = get_stem_grade_level(grade)
+    curr = _steam_curriculum_block(subject, grade)
     return f"""אתה מתכנן יחידת לימוד בשיטת א"ל השד"ה — גרסת STEAM (מתמטיקה/מדעים/הנדסה/טכנולוגיה/אמנויות).
 
 <user_input>
 מקצוע: {subject} | נושא: {topic}
 כיתה: {grade} | גיל: {gl['age']} | מספר סבבים: {rounds}
 </user_input>
+{curr}
 
 **שינויים עיקריים בגרסת STEAM לעומת גרסת השפה:**
 - תחנת הבנה: ערוצי קלט מגוונים (טקסט/סרטון/תצפית/ניסוי) + תיעוד כתוב קצר מותר
@@ -102,6 +125,7 @@ def build_stem_comprehension_prompt(subject: str, topic: str, grade: str,
     }
     stage = progression.get(round_num, progression[min(round_num, 4)])
 
+    curr = _steam_curriculum_block(subject, grade)
     return f"""כתוב חומר לתחנת ההבנה — א"ל השד"ה גרסת STEAM.
 
 <user_input>
@@ -111,7 +135,7 @@ def build_stem_comprehension_prompt(subject: str, topic: str, grade: str,
 ערוץ קלט: {input_label} | תכנון: {desc}
 מוקד חקירה: {disc_focus}{prev}
 </user_input>
-
+{curr}
 **⚠️ הבדלים מגרסת השפה:**
 - מותר לכלול תשובה כתובה קצרה (1-3 משפטים) לצורך תיעוד הבנה
 - שלב טבלת KWL (יודע / רוצה לדעת / למדתי)

@@ -1,3 +1,5 @@
+import json
+import os
 import re
 from typing import Any, Dict
 
@@ -66,12 +68,12 @@ GRADE_LEVELS = {
     "ז-ח": {
         "age": "12-14",
         "language": "מפותח, טרמינולוגיה מקצועית",
-        "reading_mode": "קריאה עצמאית + שחזור + ניתוח",
+        "reading_mode": "קריאה עצמאית + שחזור + ניתוח ביקורתי",
         "dictation_words": 18,
-        "text_length": "600-900 מילים",
-        "comprehension_options": ["שאלות ניתוח וביקורת", "דיון על ערכים ודילמות", "קוביית ממים מתקדמת"],
-        "methods_options": ["כתיבת טיעון מנומק", "ניתוח טקסט לפי תבחינים", "כתיבת סיכום", "תשובה מיטבית"],
-        "precision_options": ["הכתבות 18-20 מילים", "שורשים ובניינים", "סוגי משפטים", "מאזכרים מתקדמים"],
+        "text_length": "800-1000 מילים",
+        "comprehension_options": ["שאלות ניתוח וביקורת", "דיון על ערכים ודילמות", "קוביית ממים מתקדמת", "השוואת שני טקסטים"],
+        "methods_options": ["כתיבת טיעון מנומק עם ראיות", "ניתוח טקסט לפי תבחינים", "כתיבת סיכום", "תשובה מיטבית", "כתיבת מאמר דעה"],
+        "precision_options": ["הכתבות 18-20 מילים", "שורשים ובניינים", "סוגי משפטים", "מאזכרים מתקדמים", "תחביר: פסוקית זיקה"],
         "vocabulary_options": ["טבלת מילים-הגדרות-משפטים", "כרזות ביטויים מורכבים", "קלפי נרדפות/הפכים לגזירה", "תשחץ מילים (word_search)", "תשבץ מיני (crossword_mini)"]
     },
     "ט-י": {
@@ -88,13 +90,13 @@ GRADE_LEVELS = {
     "יא-יב": {
         "age": "16-18",
         "language": "אקדמי, מקצועי, ניתוח עמוק",
-        "reading_mode": "קריאה עצמאית + ניתוח אקדמי",
+        "reading_mode": "קריאה עצמאית + ניתוח אקדמי + שיח ביקורתי",
         "dictation_words": 20,
         "text_length": "800-1200 מילים",
-        "comprehension_options": ["ניתוח אקדמי", "השוואה ביקורתית"],
-        "methods_options": ["כתיבה אקדמית", "ניתוח מעמיק"],
-        "precision_options": ["תרגילים אקדמיים", "ניתוח לשוני"],
-        "vocabulary_options": ["מילון מושגים אישי", "ניתוח שדות סמנטיים"]
+        "comprehension_options": ["ניתוח אקדמי מעמיק", "השוואה ביקורתית בין טקסטים", "ניתוח רטורי וסגנוני", "ניתוח טקסט לפי תיאוריות"],
+        "methods_options": ["כתיבה אקדמית מובנית", "ניתוח ספרותי מעמיק", "עבודת חקר קצרה", "מאמר השוואתי"],
+        "precision_options": ["תרגילים לשוניים ברמה גבוהה", "ניתוח לשוני-סגנוני", "עשרה תרגילי תחביר", "ניתוח שגיאות נפוצות בכתיבה"],
+        "vocabulary_options": ["מילון מושגים אישי עם הקשרים", "ניתוח שדות סמנטיים", "קלפי אסוציאציות לגזירה", "תשבץ מיני (crossword_mini)"]
     }
 }
 
@@ -125,16 +127,59 @@ def get_grade_level(grade: str) -> Dict:
 
 def needs_nikud(grade: str) -> bool:
     """Returns True for grades alef–gimel (ages 6–9) where vowel marks aid reading."""
-    # Strip common Hebrew/English prefix words to extract just the grade identifier
     clean = grade.replace("׳", "").replace("'", "")
     clean = re.sub(r'כיתה|שנה|grade|year', '', clean, flags=re.IGNORECASE).strip()
-    # Single Hebrew grade letter alef, bet, or gimel
     if clean and clean[0] in ('א', 'ב', 'ג'):
         return True
-    # Numeric grade 1-3
     if re.fullmatch(r'[1-3]', clean):
         return True
     return False
+
+
+# ─── Curriculum Knowledge Base ───────────────────────────────────────────────
+
+_CURRICULUM_KB: Dict | None = None
+
+
+def _load_curriculum_kb() -> Dict:
+    global _CURRICULUM_KB
+    if _CURRICULUM_KB is None:
+        kb_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'curriculum_kb.json'))
+        try:
+            with open(kb_path, encoding='utf-8') as f:
+                _CURRICULUM_KB = json.load(f)
+        except Exception:
+            _CURRICULUM_KB = {}
+    return _CURRICULUM_KB
+
+
+def _subject_to_domain(subject: str) -> str:
+    """Map a free-text subject string to a curriculum_kb domain key."""
+    # Import here to avoid circular import; is_stem/is_english defined below
+    s = subject.lower()
+    if any(k in s for k in ("היסטוריה", "history", "אזרחות", "גיאוגרפיה", "geography")):
+        return "history"
+    if any(k in s for k in ("english", "אנגלית")):
+        return "english"
+    if any(k in s for k in ("מתמטיקה", "חשבון", "math", "אלגברה", "גיאומטריה")):
+        return "math"
+    if any(k in s for k in ("מדע", "פיזיקה", "כימיה", "ביולוגיה", "science",
+                             "מדעי הטבע", "מדע וטבע", "מד' וטכ'")):
+        return "science"
+    return "hebrew"
+
+
+def get_curriculum_profile(grade: str, subject: str) -> Dict:
+    """Return the curriculum knowledge profile for this grade band + subject.
+
+    Returns an empty dict if no data is available — callers must handle that.
+    """
+    kb = _load_curriculum_kb()
+    g = grade.replace("׳", "").replace("'", "")
+    band = _GRADE_MAP.get(g, "ז-ח")
+    band_data = kb.get(band, {})
+    domain = _subject_to_domain(subject)
+    return band_data.get(domain, band_data.get("hebrew", {}))
 
 
 # ─── STEM / STEAM ───────────────────────────────────────────────────────────
