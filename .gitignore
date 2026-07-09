@@ -62,6 +62,7 @@ plans/
 !README.md
 !ARCHITECTURE.md
 !DEPLOYMENT.md
+!summeryTillNow.md
 
 # Certbot / SSL (populated on first deploy)
 certbot/
