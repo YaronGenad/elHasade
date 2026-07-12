@@ -89,10 +89,10 @@ class ImageService:
 
     # Topic comes FIRST so Pexels/Wikimedia searches are topic-driven
     STATION_PEXELS_QUERIES = {
-        "comprehension": "{topic} reading story children",
-        "methods":       "{topic} writing creative school",
-        "precision":     "{topic} learning language letters",
-        "vocabulary":    "{topic} symbols education colorful",
+        "comprehension": "{topic} children outdoor scene",
+        "methods":       "{topic} activity hands creative",
+        "precision":     "{topic} close-up detail texture",
+        "vocabulary":    "{topic} colorful nature objects",
     }
 
     # Activity phrase used in SVG scene hints — kept short so topic dominates
@@ -362,6 +362,9 @@ class ImageService:
                     f"(e.g. matzah/seder plate for Passover, hamantaschen/masks for Purim, menorah/dreidel for Hanukkah, "
                     f"Israeli flag/blue and white for Independence Day) — never use generic Jewish or holiday imagery.\n"
                     f"- Avoid words that fit multiple holidays (family, meal, table, candles alone).\n"
+                    f"IMPORTANT: Return ONLY keywords for purely visual images with NO text. "
+                    f"Avoid: open books showing pages, signs, posters, blackboards, newspapers, product labels. "
+                    f"Prefer: nature scenes, people in action, physical objects, landscapes, animals, architecture.\n"
                     f"Return ONLY English keywords separated by spaces, no punctuation, no explanations, max 6 words total."
                 ),
             )
@@ -406,6 +409,9 @@ class ImageService:
                     f"(matzah/seder plate for Passover, hamantaschen/masks for Purim, menorah/dreidel for Hanukkah, "
                     f"Israeli flag/blue and white for Independence Day, pranks/jokes for April Fools).\n"
                     f"- Avoid generic words that match multiple topics (family, meal, table, candles alone).\n"
+                    f"IMPORTANT: Return ONLY keywords for purely visual images with NO text. "
+                    f"Avoid: open books showing pages, signs, posters, blackboards, newspapers, product labels. "
+                    f"Prefer: nature scenes, people in action, physical objects, landscapes, animals, architecture.\n"
                     f"Return ONLY English keywords separated by spaces, no punctuation, no explanations, max 5 words total."
                 ),
             )

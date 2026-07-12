@@ -111,6 +111,8 @@ export interface SubmitGenerationData {
   grade: string;
   rounds: number;
   force_new?: boolean;
+  include_stem?: boolean;
+  stem_description?: string;
 }
 
 export type FileType =

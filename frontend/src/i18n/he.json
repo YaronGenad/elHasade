@@ -75,7 +75,10 @@
     "noSimilar": "לא נמצאו חומרים דומים",
     "foundSimilar": "נמצאו {{count}} תוצאות דומות!",
     "roundsLabel": "סבבים",
-    "valueTooLong": "ערך ארוך מדי"
+    "valueTooLong": "ערך ארוך מדי",
+    "includeStem": "כלול רכיב STEM ביחידה",
+    "stemDescription": "תיאור STEM (אופציונלי)",
+    "stemDescriptionPlaceholder": "לדוגמה: חיבור לפיזיקה — גלים וקול"
   },
   "detail": {
     "grade": "כיתה",

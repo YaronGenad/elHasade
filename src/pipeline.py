@@ -59,7 +59,7 @@ def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> 
     log.info("roadmap_start", topic=topic, subject=subject, grade=grade, rounds=rounds)
 
     provider = _PROVIDER_LABEL
-    steam_mode = is_stem(subject)
+    steam_mode = user_input.get("include_stem", False)
     english_mode = is_english(subject)
     if steam_mode:
         mode_label = "STEAM"
@@ -138,7 +138,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
 
     round_plan = rounds_list[round_num - 1]
 
-    steam_mode = is_stem(subject)
+    steam_mode = user_input.get("include_stem", False)
     english_mode = is_english(subject)
     if steam_mode:
         mode_label = "STEAM"

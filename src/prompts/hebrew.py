@@ -1,5 +1,5 @@
 from typing import Any, Dict, List
-from ..config import get_grade_level, get_curriculum_profile, needs_nikud
+from ..config import get_grade_level, get_curriculum_profile, needs_nikud, parse_literature_context, get_learning_skills
 
 
 def _curriculum_block(subject: str, grade: str) -> str:
@@ -44,6 +44,23 @@ def _nikud_note(grade: str) -> str:
 def build_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> str:
     gl = get_grade_level(grade)
     curr = _curriculum_block(subject, grade)
+    lit = parse_literature_context(subject, topic)
+    if lit["mode"] == "author_rotating":
+        lit_block = (
+            f'\n<literature_control>\n'
+            f'יוצר: {lit["author"]}. כל סבב חייב לעסוק ביצירה שונה של אותו יוצר.\n'
+            f'ציין שם יצירה ספציפי בשדה description של תחנת ההבנה בכל סבב. אסור לחזור על אותה יצירה.\n'
+            f'</literature_control>\n'
+        )
+    elif lit["mode"] == "specific_work":
+        lit_block = (
+            f'\n<literature_control>\n'
+            f'כל הסבבים עוסקים ביצירה: "{lit["specific_work"]}". '
+            f'כל סבב בוחן היבט אחר של אותה יצירה (עלילה / דמויות / מסר / שפה / מבנה).\n'
+            f'</literature_control>\n'
+        )
+    else:
+        lit_block = ""
     return f"""אתה מתכנן יחידת לימוד בשיטת א"ל השד"ה (הבנה, שיטות, דיוק, הרחבת אוצר מילים).
 
 <user_input>
@@ -51,7 +68,7 @@ def build_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int) -> s
 כיתה: {grade} | גיל: {gl['age']} | רמת שפה: {gl['language']}
 מספר סבבים: {rounds}
 </user_input>
-{curr}
+{curr}{lit_block}
 
 **חוקי ברזל:**
 1. כל 4 תחנות בכל סבב — **עצמאיות לחלוטין** (תלמיד יכול להתחיל בכל אחת)
@@ -136,6 +153,11 @@ def build_comprehension_prompt(subject: str, topic: str, grade: str,
 מוקד הדיון: {disc_focus}{prev}
 </user_input>
 {curr}
+<standalone_rule>
+יחידה זו עצמאית לחלוטין. תלמיד מגיע ישירות לתחנה זו ללא קשר לתחנות אחרות.
+אסור לכתוב "כפי שקראנו", "הטקסט שלמדנו", "מהפעילות הקודמת", או כל התייחסות לתחנה אחרת.
+</standalone_rule>
+
 **אפשרויות פעילות לתחנת הבנה לגיל זה:** {', '.join(gl['comprehension_options'])}
 
 **⚠️ חוקים קריטיים:**
@@ -184,8 +206,20 @@ def build_methods_prompt(subject: str, topic: str, grade: str,
     key_terms = comprehension_text.get('all_key_terms', [])
 
     text_summary = comprehension_text.get('section_title', '') + ": "
-    for p in comprehension_text.get('paragraphs', [])[:2]:
-        text_summary += p.get('text', '')[:200] + "... "
+    for p in comprehension_text.get('paragraphs', [])[:3]:
+        text_summary += p.get('text', '')[:180] + "... "
+
+    skills = get_learning_skills(grade)
+    skills_block = ""
+    if skills:
+        skills_lines = "\n".join(f"• {s}" for s in skills)
+        skills_block = (
+            f"\n<grade_learning_skills>\n"
+            f"מיומנויות הלמידה הרשמיות לכיתה {grade} לפי תכנית הלימודים:\n"
+            f"{skills_lines}\n"
+            f"בחר מיומנות מהרשימה שמתאימה לסוג הכתיבה הנוכחי ({writing_type}) ושלב אותה במשימה.\n"
+            f"</grade_learning_skills>\n"
+        )
 
     return f"""צור משימת כתיבה מובנית לתחנת השיטות — א"ל השד"ה.{_nikud_note(grade)}
 <user_input>
@@ -193,9 +227,15 @@ def build_methods_prompt(subject: str, topic: str, grade: str,
 כיתה: {grade} | גיל: {gl['age']}
 סוג הכתיבה: {writing_type} | תכנון: {methods_desc}
 מונחים מהטקסט: {', '.join(key_terms[:8])}
-הקשר הטקסט: {text_summary[:300]}
+הקשר הטקסט: {text_summary[:500]}
 </user_input>
 
+<standalone_rule>
+יחידה זו עצמאית לחלוטין. תלמיד מגיע ישירות לתחנה זו ללא גישה לטקסט מהתחנות האחרות.
+אסור לכתוב "כפי שקראנו", "הטקסט שלמדנו", "מהפעילות הקודמת", או כל התייחסות לתחנה אחרת.
+כלול בראש דף המשימה "רקע קצר" (3-4 משפטים) על הנושא, כך שתלמיד שלא ראה טקסט אחר יוכל להבין את ההקשר.
+</standalone_rule>
+{skills_block}
 **סוגי כתיבה אפשריים ודרישותיהם:**
 - טיעון: עמדה + 3 נימוקים + סיכום, כיתה ד ומעלה
 - תיאור: דמות/מקום/אירוע — חושים + פרטים + תחושות
@@ -262,6 +302,12 @@ def build_precision_prompt(subject: str, topic: str, grade: str,
 מילים מהטקסט: {', '.join(key_terms[:12])}
 מספר מילים להכתבה לגיל זה: {gl['dictation_words']}
 </user_input>
+
+<standalone_rule>
+יחידה זו עצמאית לחלוטין. תלמיד מגיע ישירות לתחנה זו ללא קשר לתחנות אחרות.
+אסור לכתוב "כפי שקראנו" או כל התייחסות לטקסט מתחנות אחרות.
+בראש הדף הוסף: "בשביל ההקשר: [2-3 משפטים קצרים על {topic}]" לפני הפעילות.
+</standalone_rule>
 
 **ארגז הכלים הלשוני המלא — בחר מגוון:**
 - הכתבה: מילים ומשפטים מהטקסט
@@ -340,6 +386,12 @@ def build_vocabulary_prompt(subject: str, topic: str, grade: str,
 מונחים מהטקסט: {', '.join(key_terms[:12])}
 סוגים שכבר השתמשנו בהם: {', '.join(used_types) if used_types else 'אין'}
 </user_input>
+
+<standalone_rule>
+יחידה זו עצמאית לחלוטין. תלמיד מגיע ישירות לתחנה זו ללא קשר לתחנות אחרות.
+אסור לכתוב "כפי שקראנו" או כל התייחסות לתוכן מתחנות אחרות.
+בראש הדף הוסף: "בשביל ההקשר: [2-3 משפטים קצרים על {topic}]" לפני רשימת המילים.
+</standalone_rule>
 {physical_note}
 
 **עקרון התחנה:** "מה שנצרב בעור נשמר לנצח" — זיכרון ויזואלי + שמיעתי + תחושתי-מוטורי
@@ -423,6 +475,11 @@ def build_teacher_prep_prompt(subject: str, topic: str, grade: str,
 <user_input>
 נושא: {subject} — {topic} | כיתה: {grade} | סבב {round_num}
 </user_input>
+
+<standalone_rule>
+כל תחנה עצמאית לחלוטין — תלמיד יכול להתחיל בכל תחנה שהיא ללא תלות בתחנות אחרות.
+ודא שהמורה מודעת לכך ושכל דף תחנה כולל את כל הרקע שהתלמיד צריך.
+</standalone_rule>
 
 **תחנות הסבב:**
 - הבנה: {comp.get('section_title', '')} ({len(comp.get('paragraphs', []))} פסקאות) — **תחנה בעל פה בלבד**, המורה לא נמצאת כאן

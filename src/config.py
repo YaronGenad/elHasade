@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
 # ─── LLM Configuration ─────────────────────────────────────────────────────────
@@ -493,3 +493,80 @@ def get_stem_grade_level(grade: str) -> Dict:
     g = grade.replace("׳", "").replace("'", "")
     band = _GRADE_MAP.get(g, "ז-ח")
     return STEM_GRADE_ADAPTATIONS.get(band, STEM_GRADE_ADAPTATIONS["ז-ח"])
+
+
+# ── Literature context detection ─────────────────────────────────────────────
+
+_LIT_SUBJECTS = {"ספרות", "לשון", "עברית", "שירה", "מחזה"}
+_AUTHOR_KEYWORDS = {"ויצירתו", "ויצירתה", "ויצירתם", "משורר", "סופרת", "מחבר", "סופר ויצירתו"}
+
+
+def parse_literature_context(subject: str, topic: str) -> dict:
+    """Detect literature mode and extract author/work details from user input."""
+    if not any(k in subject for k in _LIT_SUBJECTS):
+        return {"mode": "standard", "author": None, "specific_work": None}
+    if any(k in topic for k in _AUTHOR_KEYWORDS):
+        parts = [p.strip() for p in topic.replace("—", "–").replace("–", "-").split("-")]
+        author = parts[-1] if parts else topic
+        return {"mode": "author_rotating", "author": author, "specific_work": None}
+    parts = [p.strip() for p in topic.replace("—", "–").replace("–", "-").split("-") if p.strip()]
+    if len(parts) >= 2:
+        return {"mode": "specific_work", "author": parts[0], "specific_work": "-".join(parts[1:])}
+    return {"mode": "specific_work", "author": None, "specific_work": topic}
+
+
+# ── Learning skills by grade (official MoE curriculum) ───────────────────────
+
+LEARNING_SKILLS_BY_GRADE: Dict[str, List[str]] = {
+    "א": [
+        "טרום קריאה: זיהוי כותרת ותמונה", "מילות שאלה ומילות הוראה", "רצף ארועים",
+        "הדגשת שאלה ותשובה בצבע זהה", "כתיבת תשובה מלאה / שאילת שאלות",
+        "נקודה בסוף משפט וסימן שאלה", "מבנה המשפט", "הנגנה וחריזה",
+        "זכר-נקבה, יחיד-רבים", "שיח בעל-פה: מי/מתי/איך",
+    ],
+    "ב": [
+        "ניבוי עפ\"י כותרת", "מילון כיס", "רפלקציה אישית",
+        "מסר גלוי / מסר סמוי", "כתיבת משפט סיבה + תוצאה", "פיצוח שאלה",
+        "מאזכרים", "שייכות", "מילים נרדפות",
+        "הבעת עמדה בכתב בעקבות קריאה", "כתיבת תשובה מיטבית",
+        "מאפיינים זהים ב-2 טקסטים", "פיצוח שאלה בעלת 2 חלקים", "מילות רמז",
+    ],
+    "ג": [
+        "חלוקת טקסט לפסקאות", "מציאת משפטי מפתח ומילות מפתח",
+        "רעיון מרכזי של פסקה: על מי/מה? מה נאמר עליו?",
+        "הבעת עמדה בהתבסס על קריאה", "הסקת מסקנות", "יישום והערכה",
+        "שורשים ומשפחות מילים (פועל/שם/תואר)", "מילים נרדפות",
+        "עמדה אישית בעל-פה", "הבנת מילים עפ\"י הקשר",
+        "מרכאות ומאזכרים", "שאילת שאלות", "מיון בדרכים שונות",
+    ],
+    "ד": [
+        "חזרה ובסוס מיומנויות ג'", "הסקת מסקנות", "יישום והערכה",
+        "מילות קישור", "סמיכות", "טקסט רב-היצגי",
+        "מיזוג והשוואה בין טקסטים", "אפיון דמות", "תרשים זרימה",
+        "כתיבת המלצה: שכנוע והרצף המשפטי",
+        "נקודות מבט שונות", "מילות שכנוע", "מילות העצמה",
+    ],
+    "ה": [
+        "חזרה ובסוס מיומנויות ד'",
+        "כתיבה טיעונית (להסיק ממסרטונים, ללא תבניות)",
+        "מילות קישור ומיליות", "שם פעולה", "שם פועל",
+        "סמיכות", "כינויי קניין", "מילות יחס", "טקסט רב-היצגי",
+    ],
+    "ו": [
+        "חזרה ובסוס מיומנויות ה'", "פעיל-סביל", "נוכח-נסתר",
+        "סיכום ומיזוג בין 2 טקסטים", "כתיבת פסקה תחת נושא",
+        "הכללה ופירוט", "טקסט רב-היצגי",
+    ],
+}
+
+
+def get_learning_skills(grade: str) -> List[str]:
+    """Return the official learning skills list for a given grade."""
+    g = grade.replace("׳", "").replace("'", "").replace("כיתה", "").strip()
+    if "-" in g or "–" in g:
+        parts = g.replace("–", "-").split("-")
+        result: List[str] = []
+        for p in parts:
+            result += LEARNING_SKILLS_BY_GRADE.get(p.strip(), [])
+        return list(dict.fromkeys(result))
+    return LEARNING_SKILLS_BY_GRADE.get(g, [])

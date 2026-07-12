@@ -34,6 +34,10 @@ def build_stem_roadmap_prompt(subject: str, topic: str, grade: str, rounds: int)
 כיתה: {grade} | גיל: {gl['age']} | מספר סבבים: {rounds}
 </user_input>
 {curr}
+<standalone_rule>
+כל 4 תחנות בכל סבב — עצמאיות לחלוטין. תלמיד יכול להתחיל בכל תחנה שהיא.
+תחנה X אינה יכולה להסתמך על תוצר מתחנה Y — אם נדרשים נתונים, הכנס אותם ישירות לתחנה.
+</standalone_rule>
 
 **שינויים עיקריים בגרסת STEAM לעומת גרסת השפה:**
 - תחנת הבנה: ערוצי קלט מגוונים (טקסט/סרטון/תצפית/ניסוי) + תיעוד כתוב קצר מותר
@@ -136,6 +140,11 @@ def build_stem_comprehension_prompt(subject: str, topic: str, grade: str,
 מוקד חקירה: {disc_focus}{prev}
 </user_input>
 {curr}
+<standalone_rule>
+יחידה זו עצמאית לחלוטין. תלמיד מגיע ישירות לתחנה זו ללא קשר לתחנות אחרות.
+אסור לכתוב "כפי שקראנו", "הניסוי שביצענו", "מהפעילות הקודמת", או כל התייחסות לתחנה אחרת.
+</standalone_rule>
+
 **⚠️ הבדלים מגרסת השפה:**
 - מותר לכלול תשובה כתובה קצרה (1-3 משפטים) לצורך תיעוד הבנה
 - שלב טבלת KWL (יודע / רוצה לדעת / למדתי)
@@ -220,6 +229,11 @@ def build_stem_methods_prompt(subject: str, topic: str, grade: str,
 הקשר: {text_summary[:300]}
 </user_input>{data_note}
 
+<standalone_rule>
+יחידה זו עצמאית לחלוטין. תלמיד מגיע ישירות לתחנה זו ללא קשר לתחנות אחרות.
+אם המשימה מצריכה נתוני ניסוי — ספק אותם ישירות בתוך המשימה (אל תפנה לניסוי מתחנת הדיוק).
+</standalone_rule>
+
 **מסגרות חשיבה זמינות לגיל זה:** {', '.join(sgl['methods_frameworks'])}
 
 **חוקים:**
@@ -279,6 +293,10 @@ def build_stem_precision_prompt(subject: str, topic: str, grade: str,
 תכנון: {precision_desc}
 מונחי מפתח: {', '.join(key_terms[:10])}
 </user_input>
+
+<standalone_rule>
+יחידה זו עצמאית לחלוטין. כלול הוראות מלאות ורקע מינימלי כך שתלמיד יכול להתחיל ישירות ללא תלות בתחנות אחרות.
+</standalone_rule>
 
 **פעילויות HANDS-ON מתאימות לגיל זה:** {', '.join(sgl['precision_activities'])}
 
@@ -364,6 +382,11 @@ def build_stem_vocabulary_prompt(subject: str, topic: str, grade: str,
 סוגים שבוצעו כבר: {', '.join(used_types) if used_types else 'אין'}
 </user_input>
 
+<standalone_rule>
+יחידה זו עצמאית לחלוטין. תלמיד מגיע ישירות לתחנה זו ללא קשר לתחנות אחרות.
+כלול הוראות משחק מלאות כך שתלמיד יוכל להתחיל ישירות.
+</standalone_rule>
+
 **עקרון STEAM לתחנה זו:**
 - כל מונח: עברית + אנגלית + הגדרה + קטגוריית STEAM (מדעים/מתמטיקה/הנדסה/טכנולוגיה/אמנויות)
 - המשחק צריך להיות מהנה, תחרותי, ומפנים את המושגים לזיכרון ארוך-טווח
@@ -426,6 +449,11 @@ def build_stem_teacher_prep_prompt(subject: str, topic: str, grade: str,
 <user_input>
 מקצוע: {subject} | נושא: {topic} | כיתה: {grade} | סבב {round_num}
 </user_input>
+
+<standalone_rule>
+כל תחנה עצמאית לחלוטין — תלמיד יכול להתחיל בכל תחנה שהיא ללא תלות בתחנות אחרות.
+ודא שהמורה מודעת לכך ושכל דף תחנה כולל את כל הרקע, הנתונים וההוראות שהתלמיד צריך.
+</standalone_rule>
 
 **תחנות הסבב (STEAM Edition):**
 - 🔴 הבנה: {comp.get('section_title', '')} | ערוץ: {comp.get('input_type', 'text')} — תיעוד כתוב קצר מותר

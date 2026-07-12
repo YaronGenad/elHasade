@@ -27,6 +27,8 @@ class GenerationRequest(BaseModel):
         default=False,
         description="Skip cache/similarity checks and always generate fresh materials",
     )
+    include_stem: bool = False
+    stem_description: Optional[str] = Field(default=None, max_length=300)
 
     @field_validator('subject', 'topic', 'grade', mode='before')
     @classmethod

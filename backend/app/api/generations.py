@@ -408,6 +408,8 @@ async def create_generation(
             "topic": generation_request.topic,
             "grade": generation_request.grade,
             "rounds": generation_request.rounds,
+            "include_stem": generation_request.include_stem,
+            "stem_description": generation_request.stem_description or "",
         },
         generation_service,
         query_hash,

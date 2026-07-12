@@ -18,6 +18,8 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Grid from '@mui/material/Grid';
 import Skeleton from '@mui/material/Skeleton';
 import Tooltip from '@mui/material/Tooltip';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import SendIcon from '@mui/icons-material/Send';
 import SearchIcon from '@mui/icons-material/Search';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -38,6 +40,8 @@ const generationSchema = z.object({
   topic: z.string().min(1, 'שדה חובה / حقل مطلوب').max(200, 'ערך ארוך מדי / القيمة طويلة جداً').transform(sanitize),
   grade: z.string().min(1, 'שדה חובה / حقل مطلוب').max(50, 'ערך ארוך מדי / القيمة طويلة جداً').transform(sanitize),
   rounds: z.number().min(1).max(10),
+  include_stem: z.boolean().default(false),
+  stem_description: z.string().max(300).optional(),
 });
 
 type GenerationFormData = z.infer<typeof generationSchema>;
@@ -60,6 +64,7 @@ export const NewGenerationPage: React.FC = () => {
     resolver: zodResolver(generationSchema),
     defaultValues: {
       rounds: 4,
+      include_stem: false,
     },
   });
 
@@ -67,6 +72,7 @@ export const NewGenerationPage: React.FC = () => {
   const subject = watch('subject');
   const topic = watch('topic');
   const grade = watch('grade');
+  const watchIncludeStem = watch('include_stem');
 
   // Build composite search query from form fields
   useEffect(() => {
@@ -185,6 +191,33 @@ export const NewGenerationPage: React.FC = () => {
                     <Typography variant="caption" color="text.secondary">1</Typography>
                     <Typography variant="caption" color="text.secondary">10</Typography>
                   </Box>
+                </Box>
+
+                {/* STEM opt-in */}
+                <Box>
+                  <FormControlLabel
+                    control={
+                      <Controller
+                        name="include_stem"
+                        control={control}
+                        render={({ field }) => (
+                          <Checkbox {...field} checked={field.value ?? false} />
+                        )}
+                      />
+                    }
+                    label={t('generation.includeStem')}
+                  />
+                  {watchIncludeStem && (
+                    <TextField
+                      {...register('stem_description')}
+                      label={t('generation.stemDescription')}
+                      placeholder={t('generation.stemDescriptionPlaceholder')}
+                      multiline
+                      rows={2}
+                      fullWidth
+                      sx={{ mt: 1 }}
+                    />
+                  )}
                 </Box>
 
                 {/* Submit button */}
