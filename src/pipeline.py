@@ -290,6 +290,12 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
                                                   hint=_comp_hint, used_image_keys=used_image_keys)
         log.info("comprehension_image_fetched", hint_chars=len(_comp_hint),
                  found=bool(topic_images["comprehension"]))
+        # Re-fetch remaining stations with story context hint for better visual precision
+        for _st in ("methods", "precision", "vocabulary"):
+            _better = _img.fetch(topic, grade, _st, round_num,
+                                 hint=_comp_hint, used_image_keys=used_image_keys)
+            if _better:
+                topic_images[_st] = _better
     comp_html = _render("comprehension", render_comprehension, topic, round_num, comp_data, grade,
                         english_mode=english_mode, topic_image=topic_images["comprehension"],
                         svg_decorative=svg_images.get("comprehension"),

@@ -99,8 +99,8 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
     else:
         traffic = f"""
         <div class="traffic-light">
-            <div class="tl-green"><div class="tl-label">\U0001f7e2 בסיסי</div>{dl.get('green', '')}</div>
-            <div class="tl-yellow"><div class="tl-label">\U0001f7e1 רגיל</div>{dl.get('yellow', '')}</div>
+            <div class="tl-green"><div class="tl-label">\U0001f7e2 קל</div>{dl.get('green', '')}</div>
+            <div class="tl-yellow"><div class="tl-label">\U0001f7e1 בינוני</div>{dl.get('yellow', '')}</div>
             <div class="tl-red"><div class="tl-label">\U0001f534 מאתגר</div>{dl.get('red', '')}</div>
         </div>
         """
