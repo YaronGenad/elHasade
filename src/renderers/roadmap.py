@@ -31,7 +31,7 @@ def render_roadmap(title: str, roadmap: Dict, english_mode: bool = False) -> str
         html_dir = "ltr"
         html_lang = "en"
         page_title = f"Unit Roadmap - {title}"
-        footer_text = f"Al-HaSadeh | Unit Roadmap | {title} — © All rights reserved"
+        footer_text = f"מחולל יחידות לימוד | Unit Roadmap | {title} — © All rights reserved"
         method_label = "שיטת א\"ל השד\"ה"
         rounds_count_label = "rounds"
     elif is_steam:

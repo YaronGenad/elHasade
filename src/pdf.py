@@ -179,7 +179,7 @@ def _make_cover_html(title: str, cover_subtitle: str, subject: str = "", grade: 
         <div class="logo-ring">
             {'<img src="' + logo_url + '" class="logo" alt="לוגו" />' if logo_url else '<div class="logo-placeholder">📚</div>'}
         </div>
-        <div class="method-tag">AL-HASADEH METHOD</div>
+        <div class="method-tag">מחולל יחידות לימוד</div>
         <div class="method-title">שיטת א"ל השד"ה</div>
         <div class="method-sub">COOPERATIVE LEARNING STATIONS</div>
         <div class="divider">

@@ -53,7 +53,7 @@ export const Navbar: React.FC = () => {
         <Box
           component="img"
           src="/logo.jpg"
-          alt="אל השד״ה"
+          alt="מחולל יחידות לימוד"
           sx={{ height: 36, width: 'auto', borderRadius: 1, mr: 1, cursor: 'pointer' }}
           onClick={() => navigate('/dashboard')}
         />

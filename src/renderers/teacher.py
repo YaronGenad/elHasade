@@ -20,7 +20,7 @@ def render_teacher_prep(title: str, round_num: int, data: Dict, content: Dict,
         html_dir = "ltr"
         html_lang = "en"
         page_title = f"Teacher Preparation - {title} - Round {round_num}"
-        footer_text = f"Al-HaSadeh | Teacher Preparation | {title} | Round {round_num} — {lbl['footer_copy']}"
+        footer_text = f"מחולל יחידות לימוד | Teacher Preparation | {title} | Round {round_num} — {lbl['footer_copy']}"
         teacher_only_msg = lbl['teacher_only']
         objectives_title = "🎯 Round Objectives"
         knowledge_label = "Knowledge:"
@@ -166,7 +166,7 @@ def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_da
         methods_title = "🔵 Success Criteria — Methods Station"
         criteria_label = "Assessment criteria:"
         list_pad = "padding-left:18px;"
-        footer_text = f"Al-HaSadeh | Answer Key | {title} | Round {round_num} — © All rights reserved"
+        footer_text = f"מחולל יחידות לימוד | Answer Key | {title} | Round {round_num} — © All rights reserved"
     else:
         html_dir = "rtl"
         html_lang = "he"
@@ -227,7 +227,7 @@ def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_da
         </div>"""
 
     if english_mode:
-        footer_text = f"Al-HaSadeh | Answer Key | {title} | Round {round_num} — © All rights reserved"
+        footer_text = f"מחולל יחידות לימוד | Answer Key | {title} | Round {round_num} — © All rights reserved"
 
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">

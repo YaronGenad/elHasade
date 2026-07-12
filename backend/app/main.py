@@ -73,7 +73,7 @@ except ImportError:
 limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
-    title="א״ל השד״ה — Al-Hasade Educational Material Generator",
+    title="מחולל יחידות לימוד",
     description="Production-ready system for generating educational materials using the Al-Hasade active learning methodology",
     version="1.0.0",
 )

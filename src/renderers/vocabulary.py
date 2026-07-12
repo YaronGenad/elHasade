@@ -233,7 +233,7 @@ def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool
         html_dir = "ltr"
         html_lang = "en"
         page_title = f"Vocabulary Station - {title} - Round {round_num}"
-        footer_text = f"Al-HaSadeh | Vocabulary Station | {title} | Round {round_num} — {lbl['footer_copy']}"
+        footer_text = f"מחולל יחידות לימוד | Vocabulary Station | {title} | Round {round_num} — {lbl['footer_copy']}"
         cards_title = "✂️ Word Cards (cut out)"
         defs_title = "✂️ Definition Cards (cut out — shuffled!)"
         scissors_hint = lbl['scissors']

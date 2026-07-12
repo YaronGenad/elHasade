@@ -26,7 +26,7 @@ def render_precision(title: str, round_num: int, data: Dict, english_mode: bool 
         html_dir = "ltr"
         html_lang = "en"
         page_title = f"Precision Station - {title} - Round {round_num}"
-        footer_text = f"Al-HaSadeh | Precision Station | {title} | Round {round_num} — {lbl['footer_copy']}"
+        footer_text = f"מחולל יחידות לימוד | Precision Station | {title} | Round {round_num} — {lbl['footer_copy']}"
         list_padding = "padding-left:20px;"
     else:
         diff_color = {"קל": "#d5f5e3", "בינוני": "#fef9e7", "קשה": "#fadbd8"}

@@ -92,7 +92,7 @@ export const LoginPage: React.FC = () => {
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Box component="img"
               src="/logo.jpg"
-              alt="אל השד״ה"
+              alt="מחולל יחידות לימוד"
               sx={{ height: 80, width: 'auto', mb: 1.5, borderRadius: 2 }}
             />
             <Typography variant="h4" color="primary" gutterBottom fontWeight={800}>

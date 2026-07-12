@@ -102,7 +102,7 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
         html_dir = "ltr"
         html_lang = "en"
         page_title = f"Comprehension Station - {title} - Round {round_num}"
-        footer_text = f"Al-HaSadeh | Comprehension Station | {title} | Round {round_num} — {lbl['footer_copy']}"
+        footer_text = f"מחולל יחידות לימוד | Comprehension Station | {title} | Round {round_num} — {lbl['footer_copy']}"
     else:
         disc_box = f"""
         <div class="section-block" style="background:#fadbd8; border:2px solid #e74c3c; border-radius:8px; padding:10px 14px; margin-top:14px;">
