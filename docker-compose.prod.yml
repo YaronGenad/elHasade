@@ -59,7 +59,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=https://${DOMAIN}/api
+        - VITE_API_URL=/api
     restart: unless-stopped
     expose:
       - "80"

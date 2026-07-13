@@ -22,7 +22,7 @@ services:
   frontend:
     build:
       args:
-        - VITE_API_URL=http://${DOMAIN}/api
+        - VITE_API_URL=/api
 
   backend:
     environment:
