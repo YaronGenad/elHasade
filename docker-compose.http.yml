@@ -1,0 +1,29 @@
+# Override for HTTP-only deployment (no domain, no SSL).
+# Usage:
+#   docker compose \
+#     -f docker-compose.prod.yml \
+#     -f docker-compose.db.yml \
+#     -f docker-compose.http.yml \
+#     --env-file .env.prod up -d
+
+services:
+
+  nginx:
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.http.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+
+  certbot:
+    profiles:
+      - ssl
+
+  frontend:
+    build:
+      args:
+        - VITE_API_URL=http://${DOMAIN}/api
+
+  backend:
+    environment:
+      CORS_ORIGINS: "http://${DOMAIN},http://localhost:3000"

@@ -69,3 +69,7 @@ certbot/
 
 # Local backups
 backups/
+
+# SSH keys / PEM files — never commit
+*.pem
+*.key

@@ -7,12 +7,70 @@
 | AWS LightSail instance | 2 vCPU / 4GB RAM (מינימום) |
 | Docker | 24+ |
 | Docker Compose | v2+ |
+| Ubuntu | 24.04 LTS (נבדק) |
 | מפתח Gemini API | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
-| דומיין + DNS | A-record מצביע ל-LightSail IP |
+| דומיין + DNS | A-record מצביע ל-LightSail IP (לא חובה לבדיקה — ראה Quick Test) |
 
 ---
 
-## פריסה ראשונה
+## Quick Test — HTTP + Local PostgreSQL (ללא דומיין)
+
+פריסה מהירה לבדיקה עם 1-2 משתמשים, ללא SSL ולא Aurora.
+
+### 1. הגדרת `.env.prod`
+
+```bash
+DOMAIN=<IP_ADDRESS>          # למשל 63.184.212.45
+SECRET_KEY=<openssl rand -hex 32>
+GEMINI_API_KEY=<your_key>
+DB_PASSWORD=<strong_password>
+```
+
+### 2. התקנת Docker (Ubuntu 24.04)
+
+```bash
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin
+sudo usermod -aG docker $USER && newgrp docker
+```
+
+### 3. שכפול והפעלה
+
+```bash
+git clone https://github.com/YaronGenad/elHasade.git ~/alhasade
+cd ~/alhasade
+
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.db.yml \
+  -f docker-compose.http.yml \
+  --env-file .env.prod up -d --build
+
+# המתן 45 שניות לעלייה
+sleep 45
+
+# מיגרציות
+docker compose \
+  -f docker-compose.prod.yml \
+  -f docker-compose.db.yml \
+  --env-file .env.prod exec backend alembic upgrade head
+```
+
+### 4. אימות
+
+```bash
+curl http://<IP>/health
+# ציפייה: {"status":"healthy"}
+```
+
+גלוש ל: `http://<IP>` בדפדפן.
+
+### שדרוג ל-HTTPS בעתיד
+
+כשיהיה דומיין — הוסף A-record, הרץ `scripts/init-ssl.sh`, והסר את `-f docker-compose.http.yml` מהפקודה.
+
+---
+
+## פריסה ראשונה (עם דומיין + SSL)
 
 ### 1. הגדרת שרת
 
