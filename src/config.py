@@ -1,6 +1,8 @@
+import hashlib
 import json
 import os
 import re
+import unicodedata
 from typing import Any, Dict, List
 
 
@@ -29,6 +31,18 @@ GEMINI_MAX_COST_PER_GENERATION_USD: float = 0.05  # 3x observed max ($0.017); ti
 
 # ─── Pipeline Configuration ─────────────────────────────────────────────────────
 SAFE_NAME_MAX_LENGTH: int = 50
+
+
+def make_safe_name(text: str, max_len: int = 40) -> str:
+    """Return an ASCII-safe filesystem token from text (works for Hebrew or Latin).
+    Latin text is slugified; non-ASCII-only text falls back to a short MD5 hash."""
+    normalized = unicodedata.normalize("NFKD", text)
+    ascii_part = re.sub(r"[^\x00-\x7F]+", "", normalized)
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", ascii_part).strip("_")
+    slug = re.sub(r"_+", "_", slug)
+    if not slug:
+        slug = hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
+    return slug[:max_len]
 DEFAULT_ROUNDS: int = 4
 
 GRADE_LEVELS = {

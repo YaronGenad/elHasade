@@ -10,7 +10,7 @@ from .exceptions import LLMAPIError, PDFRenderError, CostLimitExceededError
 from .config import (
     is_stem, is_english, is_math, SAFE_NAME_MAX_LENGTH, DEFAULT_ROUNDS,
     GEMINI_FLASH_INPUT_COST_PER_1M, GEMINI_FLASH_OUTPUT_COST_PER_1M,
-    GEMINI_MAX_COST_PER_GENERATION_USD,
+    GEMINI_MAX_COST_PER_GENERATION_USD, make_safe_name,
 )
 from .images import ImageService, UsedImageKeys
 
@@ -108,7 +108,7 @@ def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> 
         ) from exc
 
     grade_tag = grade.replace(" ", "")
-    safe_name = f"{topic}_כיתה{grade_tag}".replace(" ", "_").replace("/", "_")[:SAFE_NAME_MAX_LENGTH]
+    safe_name = f"{make_safe_name(subject, 15)}_gr{grade_tag}_{make_safe_name(topic, 20)}"
     roadmap_html = render_roadmap(topic, roadmap, english_mode=english_mode, math_mode=math_mode)
     roadmap_path = f"{output_dir}/{safe_name}_roadmap.html"
     try:

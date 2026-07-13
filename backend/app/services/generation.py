@@ -19,6 +19,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from src.pipeline import generate_all_rounds, generate_roadmap  # noqa: E402
+from src.config import make_safe_name  # noqa: E402
 
 from app.core.config import settings as _settings  # noqa: E402
 from app.core.logging import get_logger  # noqa: E402
@@ -47,11 +48,10 @@ class GenerationService:
 
     def _get_output_directory(self, user_input: Dict[str, Any]) -> Path:
         """Return a unique timestamped directory for this generation."""
-        subject = user_input["subject"].replace(" ", "_").replace("/", "_")
-        topic = user_input["topic"].replace(" ", "_").replace("/", "_")
-        grade = user_input["grade"]
+        subject = make_safe_name(user_input["subject"], 15)
+        grade = user_input["grade"].replace(" ", "")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = self.output_base_dir / f"{subject}_{topic}_{grade}_{timestamp}"
+        output_dir = self.output_base_dir / f"{subject}_gr{grade}_{timestamp}"
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir
 
