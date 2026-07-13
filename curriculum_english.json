@@ -1,0 +1,82 @@
+{
+  "א": {
+    "level": "Pre-pre-A1",
+    "cefr": "Pre-A1",
+    "focus": "aural/oral only — songs, chants, TPR, picture recognition",
+    "writing": "none",
+    "grammar": [],
+    "productive_vocabulary": 0,
+    "dictation_words": 0,
+    "text_length": "teacher-read only, 40-80 words",
+    "writing_strategies": [],
+    "precision_targets": ["letter recognition", "phonemic awareness", "sight words (up to 10)"],
+    "avoid": ["written tasks", "spelling tests", "reading independently", "grammar rules"]
+  },
+  "ב": {
+    "level": "Pre-A1 emerging",
+    "cefr": "Pre-A1",
+    "focus": "phonics CVC words, picture-word matching, oral retell with support",
+    "writing": "copy 1-2 words only",
+    "grammar": [],
+    "productive_vocabulary": 30,
+    "dictation_words": 3,
+    "text_length": "50-100 words, heavily illustrated",
+    "writing_strategies": ["labeling (draw and label)"],
+    "precision_targets": ["CVC phonics", "sight words (20-30)", "letter-sound matching"],
+    "avoid": ["paragraph writing", "grammar rules", "independent reading of unseen text"]
+  },
+  "ג": {
+    "level": "Pre-A1",
+    "cefr": "Pre-A1",
+    "focus": "phonics CVC/CVCE decoding, sight word reading, short sentences with support",
+    "writing": "1-2 sentences heavily scaffolded",
+    "grammar": [],
+    "productive_vocabulary": 200,
+    "dictation_words": 5,
+    "text_length": "80-130 words",
+    "writing_strategies": ["description (label/draw)", "simple sentence completion"],
+    "precision_targets": ["phonics (sh/ch/th/wh)", "sight words (100+)", "CVC/CVCE spelling"],
+    "avoid": ["grammar rules", "irregular verbs", "paragraph writing", "past tense forms"]
+  },
+  "ד": {
+    "level": "A1",
+    "cefr": "A1",
+    "grammar_band": "Band I begins",
+    "focus": "simple sentences in present simple, personal pronouns, basic adjectives",
+    "writing": "3-5 sentences (~30 words)",
+    "grammar": ["present simple (I/you/he/she/we/they)", "pronouns", "basic adjectives", "plurals (regular)"],
+    "productive_vocabulary": 350,
+    "dictation_words": 8,
+    "text_length": "130-200 words",
+    "writing_strategies": ["description", "simple_opinion", "fill-in-the-blank sentences"],
+    "precision_targets": ["present simple", "plurals (regular)", "spelling patterns (ee/ea/oo)"],
+    "avoid": ["past tense", "irregular verbs", "complex grammar", "essay-length writing"]
+  },
+  "ה": {
+    "level": "A1",
+    "cefr": "A1",
+    "grammar_band": "Band I developing",
+    "focus": "past simple (regular + 5-10 irregulars), adjective order, time expressions",
+    "writing": "5-8 sentences (~50-70 words)",
+    "grammar": ["present simple", "past simple (regular)", "5-10 irregular past verbs", "adjective order", "there is/are"],
+    "productive_vocabulary": 500,
+    "dictation_words": 10,
+    "text_length": "200-300 words",
+    "writing_strategies": ["description", "narration", "optimal_response", "simple_comparison"],
+    "precision_targets": ["past simple (regular + top 10 irregulars)", "adjectives", "time expressions (yesterday/last week)"],
+    "avoid": ["will-future", "comparative forms", "complex conditionals"]
+  },
+  "ו": {
+    "level": "A1 completing",
+    "cefr": "A1",
+    "grammar_band": "Band I completing",
+    "focus": "irregular past verbs (~30), will-future, comparatives/superlatives, paragraph writing",
+    "writing": "8-12 sentences (~100-120 words, structured paragraph)",
+    "grammar": ["past simple (~30 irregular verbs)", "will-future", "there is/are", "comparative adjectives", "superlative adjectives"],
+    "productive_vocabulary": 700,
+    "dictation_words": 12,
+    "text_length": "280-400 words",
+    "writing_strategies": ["description", "narration", "optimal_response", "comparison", "summarization"],
+    "precision_targets": ["irregular past (~30 verbs)", "comparative/superlative", "will-future", "sentence connectors (and/but/because/so)"]
+  }
+}

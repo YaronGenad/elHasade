@@ -5,8 +5,14 @@ from .header import render_header
 
 
 def render_precision(title: str, round_num: int, data: Dict, english_mode: bool = False,
+                     math_mode: bool = False,
                      topic_image: Optional[str] = None,
                      decorative_image: Optional[str] = None) -> str:
+    # ── Math ניצ"ה branch ──────────────────────────────────────────
+    if math_mode or data.get('is_math_nitzah'):
+        return _render_math_precision(title, round_num, data, topic_image=topic_image,
+                                      decorative_image=decorative_image)
+
     # ── STEAM HANDS-ON branch ──────────────────────────────────────
     if data.get('is_hands_on'):
         return _render_stem_precision(title, round_num, data, topic_image=topic_image,
@@ -131,9 +137,9 @@ def render_precision(title: str, round_num: int, data: Dict, english_mode: bool 
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
-<style>{get_css('precision')}</style></head>
+<style>{get_css('precision', english_mode=english_mode, math_mode=False)}</style></head>
 <body>
-{render_header(title, round_num, 'precision', english_mode=english_mode)}
+{render_header(title, round_num, 'precision', english_mode=english_mode, math_mode=False)}
 {image_html}
 <div class="instruction-box">📌 {data.get('title', '')} — {instruction_suffix}</div>
 {dictation_html}
@@ -244,10 +250,41 @@ def _render_stem_precision(title: str, round_num: int, data: Dict,
     dl = data.get('difficulty_levels', {})
     traffic_html = f"""
     <div class="traffic-light">
-        <div class="tl-green"><div class="tl-label">🟢 בסיסי</div>{dl.get('green', '')}</div>
-        <div class="tl-yellow"><div class="tl-label">🟡 רגיל</div>{dl.get('yellow', '')}</div>
+        <div class="tl-green"><div class="tl-label">🟢 קל</div>{dl.get('green', '')}</div>
+        <div class="tl-yellow"><div class="tl-label">🟡 בינוני</div>{dl.get('yellow', '')}</div>
         <div class="tl-red"><div class="tl-label">🔴 מאתגר</div>{dl.get('red', '')}</div>
     </div>""" if dl else ""
+
+    # Graph scaffold (empty graph box for students to draw results)
+    graph = data.get('graph_scaffold', {})
+    graph_html = ""
+    if graph:
+        graph_html = f"""
+    <div class="section-block" style="margin-bottom:12px;">
+        <div class="section-title">📈 {graph.get('title', 'גרף תוצאות')}</div>
+        <div style="font-size:11.5px; color:#555; margin-bottom:6px; font-style:italic;">{graph.get('note', '')}</div>
+        <div style="position:relative; border:2px solid #27ae60; border-radius:6px; height:170px; background:#f9fef9; margin-top:6px; overflow:hidden;">
+            <div style="position:absolute; left:0; top:50%; transform:rotate(-90deg) translateX(50%); transform-origin:left center; font-size:10px; color:#555; white-space:nowrap;">{graph.get('y_axis_label', '')}</div>
+            <div style="position:absolute; bottom:4px; left:50%; transform:translateX(-50%); font-size:10px; color:#555; white-space:nowrap;">{graph.get('x_axis_label', '')}</div>
+        </div>
+    </div>"""
+
+    # Self-assessment
+    sa = data.get('self_assessment', [])
+    sa_html = ""
+    if sa:
+        sa_items = "".join([
+            f'<div style="margin-bottom:10px; font-size:12.5px;">'
+            f'<strong>☐ {item}</strong>'
+            f'<div class="answer-line"></div></div>'
+            for item in sa
+        ])
+        sa_html = f"""
+    <div style="margin-top:12px; background:#eaf3fb; border:1.5px solid #2980b9;
+         border-radius:8px; padding:12px 14px; break-before:avoid; page-break-before:avoid; break-inside:avoid;">
+        <div class="section-title">✅ הערכה עצמית</div>
+        {sa_items}
+    </div>"""
 
     stem_image_html = ""
     if topic_image:
@@ -297,7 +334,139 @@ def _render_stem_precision(title: str, round_num: int, data: Dict,
 {table_html}
 {analysis_html}
 {conc_html}
+{graph_html}
 {traffic_html}
+{sa_html}
 {stem_decorative_html}
 <div class="page-footer">א"ל השד"ה STEAM | תחנת דיוק HANDS-ON | {title} | סבב {round_num} — © כל הזכויות שמורות</div>
+</body></html>"""
+
+
+def _render_math_precision(title: str, round_num: int, data: Dict,
+                            topic_image: Optional[str] = None,
+                            decorative_image: Optional[str] = None) -> str:
+    """Renders the ניצ\"ה — נצא מהקופסה station for math mode."""
+    c = STATION_COLORS['precision']
+
+    # Formula box (instruction + example + rule)
+    formula = data.get('formula', {})
+    formula_html = ""
+    if formula:
+        formula_html = f"""
+    <div style="background:#eafaf1; border:2px solid #27ae60; border-radius:8px; padding:12px 14px; margin-bottom:12px;">
+        <div style="font-weight:700; color:#1e8449; margin-bottom:6px;">📐 נוסחת הצלחה (שלושה רכיבים חובה)</div>
+        <div style="font-size:13px; margin-bottom:4px;"><strong>1. הוראה מפורשת:</strong> {formula.get('explicit_instruction', '')}</div>
+        <div style="font-size:13px; margin-bottom:4px;"><strong>2. דוגמה פתורה:</strong> {formula.get('solved_example', '')}</div>
+        <div style="font-size:13px;"><strong>3. הכלל הגנרי:</strong> {formula.get('generic_rule', '')}</div>
+    </div>"""
+
+    # Context (real-world scenario)
+    context_html = ""
+    if data.get('context'):
+        context_html = f"""
+    <div style="background:#fef9e7; border:1.5px solid #f39c12; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:13px;">
+        <strong style="color:#e67e22;">📖 הקשר מציאותי:</strong> {data['context']}
+    </div>"""
+
+    # Traffic light (3 levels)
+    dl = data.get('difficulty_levels', {})
+    traffic_html = f"""
+    <div class="traffic-light">
+        <div class="tl-green"><div class="tl-label">🟢 קל</div>{dl.get('green', '')}</div>
+        <div class="tl-yellow"><div class="tl-label">🟡 בינוני</div>{dl.get('yellow', '')}</div>
+        <div class="tl-red"><div class="tl-label">🔴 מאתגר</div>{dl.get('red', '')}</div>
+    </div>""" if dl else ""
+
+    # Exercises (multi-step problems)
+    exercises_html = ""
+    for ex in data.get('exercises', []):
+        items_html = ""
+        for item in ex.get('items', []):
+            items_html += f"""
+            <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:12px;">
+                <div style="font-size:13px; flex:1; font-weight:600;">{item.get('question', '')}</div>
+                <div style="flex:2;">
+                    <div class="answer-line"></div>
+                    <div class="answer-line"></div>
+                </div>
+            </div>
+            """
+        exercises_html += f"""
+        <div class="section-block" style="margin-bottom:16px;">
+            <div class="section-title" style="color:#1e8449;">{ex.get('title', '')}</div>
+            <div style="font-size:12.5px; color:#555; margin:6px 0 10px; font-style:italic;">{ex.get('instruction', '')}</div>
+            {items_html}
+        </div>
+        """
+
+    # Open question
+    open_q_html = ""
+    if data.get('open_question'):
+        open_q_html = f"""
+    <div style="background:#d5f5e3; border:1.5px solid #27ae60; border-radius:8px; padding:10px 14px; margin-bottom:12px;">
+        <div style="font-weight:700; color:#1e8449; margin-bottom:6px;">💭 שאלה פתוחה:</div>
+        <div style="font-size:13px; margin-bottom:8px;">{data['open_question']}</div>
+        <div class="answer-line"></div><div class="answer-line"></div>
+    </div>"""
+
+    # Teacher note (hidden in student copy, shown in teacher prep)
+    tn = data.get('teacher_note', {})
+    teacher_note_html = ""
+    if tn:
+        hints_html = "".join([f"<li>{h}</li>" for h in tn.get('hints', [])])
+        ext_html = "".join([f"<li>{e}</li>" for e in tn.get('discussion_extensions', [])])
+        academic = tn.get('academic_source') or ''
+        teacher_note_html = f"""
+    <div style="background:#f5eef8; border:2px dashed #8e44ad; border-radius:8px; padding:10px 14px; margin-top:12px; font-size:12px;">
+        <div style="font-weight:700; color:#4a235a; margin-bottom:6px;">📋 הערת מורה (לא לתלמידים)</div>
+        <div style="margin-bottom:4px;"><strong>מטרה:</strong> {tn.get('pedagogical_goal', '')}</div>
+        {f'<ul style="padding-right:18px; margin:4px 0;">{hints_html}</ul>' if hints_html else ''}
+        {f'<div style="margin-top:4px;"><strong>הרחבה לדיון:</strong><ul style="padding-right:18px; margin:2px 0;">{ext_html}</ul></div>' if ext_html else ''}
+        {f'<div style="margin-top:4px; font-size:11px; color:#888;"><em>מקור: {academic}</em></div>' if academic else ''}
+    </div>"""
+
+    # Topic image
+    image_html = ""
+    if topic_image:
+        try:
+            from ..images import ImageService
+            data_url = ImageService.to_data_url(topic_image)
+            image_html = f"""
+            <div style="float:left; margin:0 0 14px 18px; clear:left;">
+                <img src="{data_url}"
+                     style="width:210px; height:145px; object-fit:cover;
+                            border-radius:12px; border:3px solid {c['border']};
+                            box-shadow:0 4px 10px rgba(0,0,0,0.22); display:block;" alt="">
+            </div>"""
+        except Exception:
+            pass
+
+    decorative_html = ""
+    if decorative_image:
+        try:
+            from ..images import ImageService
+            dec_url = ImageService.to_data_url(decorative_image)
+            decorative_html = f"""
+            <div style="clear:both; margin-top:14px; text-align:center;">
+                <img src="{dec_url}" style="max-width:100%; max-height:130px; object-fit:contain; border-radius:8px; opacity:0.92;" alt="">
+            </div>"""
+        except Exception:
+            pass
+
+    return f"""<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head><meta charset="UTF-8"><title>קבוצת ניצ"ה — {title} — סבב {round_num}</title>
+<style>{get_css('precision', math_mode=True)}</style></head>
+<body>
+{render_header(title, round_num, 'precision', math_mode=True)}
+{image_html}
+<div class="instruction-box">📌 {data.get('title', 'קבוצת ניצ"ה — נצא מהקופסה')} — {data.get('main_instruction', 'פתרו את הבעיות המציאותיות הבאות')}</div>
+{formula_html}
+{context_html}
+{traffic_html}
+{exercises_html}
+{open_q_html}
+{teacher_note_html}
+{decorative_html}
+<div class="page-footer">מתמטיקה יומית — א"ל השד"ה | קבוצת ניצ"ה | {title} | סבב {round_num} — © כל הזכויות שמורות</div>
 </body></html>"""

@@ -1,11 +1,11 @@
 from typing import Dict
 from ..config import STATION_COLORS
-from .css import get_css, ENGLISH_LABELS, ENGLISH_STATION_NAMES
+from .css import get_css, ENGLISH_LABELS, ENGLISH_STATION_NAMES, MATH_STATION_NAMES
 from .header import render_header
 
 
 def render_teacher_prep(title: str, round_num: int, data: Dict, content: Dict,
-                         english_mode: bool = False) -> str:
+                         english_mode: bool = False, math_mode: bool = False) -> str:
     objectives = data.get('objectives', {})
     materials = data.get('materials', {})
     timing = data.get('timing', {})
@@ -36,6 +36,26 @@ def render_teacher_prep(title: str, round_num: int, data: Dict, content: Dict,
         list_pad = "padding-left:16px;"
         notes_pad = "padding-left:18px;"
         station_name_fn = lambda k: ENGLISH_STATION_NAMES.get(k, {}).get('name', k)
+    elif math_mode:
+        html_dir = "rtl"
+        html_lang = "he"
+        page_title = f"מדריך הכנה למורה — מתמטיקה יומית — {title} — סבב {round_num}"
+        footer_text = f"מתמטיקה יומית — א\"ל השד\"ה | מדריך הכנה למורה | {title} | סבב {round_num} — © כל הזכויות שמורות"
+        teacher_only_msg = "⚠️ מדריך זה מיועד למורה בלבד — אין להעביר לתלמידים"
+        objectives_title = "🎯 מטרות הסבב (ידע, מיומנות, הרגל)"
+        knowledge_label = "ידע:"
+        skills_label = "מיומנויות:"
+        values_label = "הרגלים/ערכים:"
+        timing_title = "⏱️ תזמון מומלץ (20 דקות לכל תחנה)"
+        materials_title = "🗃️ ציוד וחומרים לכל תחנה"
+        notes_title = "📌 הוראות הפעלה ונקודות לתשומת לב"
+        diff_title = "🎯 דיפרנציאציה"
+        struggling_label = "🟢 תלמידים מתקשים:"
+        advanced_label = "🔴 תלמידים מתקדמים:"
+        special_label = "♿ חינוך מיוחד:"
+        list_pad = "padding-right:16px;"
+        notes_pad = "padding-right:18px;"
+        station_name_fn = lambda k: MATH_STATION_NAMES.get(k, {}).get('name', STATION_COLORS.get(k, {}).get('name', k))
     else:
         html_dir = "rtl"
         html_lang = "he"
@@ -96,17 +116,56 @@ def render_teacher_prep(title: str, round_num: int, data: Dict, content: Dict,
     {rot_div}
 </div>"""
 
+    # Math-specific sections
+    math_prep_html = ""
+    if math_mode:
+        printing_list = data.get('printing_list', [])
+        cutting_prep = data.get('cutting_prep', [])
+        anticipated = data.get('anticipated_difficulties', [])
+        traffic_cards = data.get('traffic_light_cards_prep', '')
+        teacher_topic = data.get('teacher_station_topic', '')
+        teacher_opening = data.get('teacher_opening_task', '')
+
+        printing_items = "".join([f"<li>{p}</li>" for p in printing_list])
+        cutting_items = "".join([f"<li>{c}</li>" for c in cutting_prep])
+        diff_items = "".join([
+            f'<div style="margin-bottom:8px; background:white; border-radius:6px; padding:8px;">'
+            f'<div style="font-weight:600; color:#4a235a;">{d.get("difficulty","")}</div>'
+            f'<div style="font-size:12px; color:#555; margin-top:3px;">💡 {d.get("generic_response","")}</div>'
+            f'</div>'
+            for d in anticipated
+        ])
+
+        math_prep_html = f"""
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+    <div style="background:#eafaf1; border:1.5px solid #27ae60; border-radius:8px; padding:12px;">
+        <div style="font-weight:800; color:#1e8449; margin-bottom:8px;">🖨️ רשימת הדפסה</div>
+        <ul style="font-size:12px; {list_pad} margin:0;">{printing_items}</ul>
+    </div>
+    <div style="background:#fef9e7; border:1.5px solid #f1c40f; border-radius:8px; padding:12px;">
+        <div style="font-weight:800; color:#7d6608; margin-bottom:8px;">✂️ הכנת חיתוכים</div>
+        <ul style="font-size:12px; {list_pad} margin:0;">{cutting_items}</ul>
+        {f'<div style="font-size:11.5px; color:#7d6608; margin-top:6px; font-style:italic;">🚦 {traffic_cards}</div>' if traffic_cards else ''}
+    </div>
+</div>
+<div style="background:#fffde7; border:2px solid #f1c40f; border-radius:8px; padding:12px; margin-bottom:14px;">
+    <div style="font-weight:800; color:#7d6608; margin-bottom:6px;">💛 תחנת המורה — נושא ההקנייה: {teacher_topic}</div>
+    <div style="font-size:12.5px;">{teacher_opening}</div>
+</div>
+{f'<div style="background:#f5eef8; border:1.5px solid #8e44ad; border-radius:8px; padding:12px; margin-bottom:14px;"><div style="font-weight:800; color:#4a235a; margin-bottom:8px;">⚠️ קשיים צפויים ותגובות גנריות מוכנות</div>{diff_items}</div>' if anticipated else ''}"""
+
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
-<style>{get_css('teacher')}</style></head>
+<style>{get_css('teacher', english_mode=english_mode, math_mode=math_mode)}</style></head>
 <body>
-{render_header(title, round_num, 'teacher', include_student_bar=False, english_mode=english_mode)}
+{render_header(title, round_num, 'teacher', include_student_bar=False, english_mode=english_mode, math_mode=math_mode)}
 
 <div style="background:#f5eef8; border:2px solid #8e44ad; border-radius:8px; padding:12px 16px; margin-bottom:14px; font-size:12px; color:#4a235a; font-weight:600;">
     {teacher_only_msg}
 </div>
 
+{math_prep_html}
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
     <div style="background:#f5eef8; border:1.5px solid #8e44ad; border-radius:8px; padding:12px;">
         <div style="font-weight:800; color:#4a235a; margin-bottom:8px;">{objectives_title}</div>
@@ -147,7 +206,8 @@ def render_teacher_prep(title: str, round_num: int, data: Dict, content: Dict,
 
 
 def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_data: Dict,
-                       methods_data: Dict, english_mode: bool = False) -> str:
+                       methods_data: Dict, english_mode: bool = False,
+                       math_mode: bool = False) -> str:
     is_steam_prec = precision_data.get('is_hands_on', False)
 
     if english_mode:
@@ -229,12 +289,22 @@ def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_da
     if english_mode:
         footer_text = f"מחולל יחידות לימוד | Answer Key | {title} | Round {round_num} — © All rights reserved"
 
+    if math_mode and not english_mode:
+        html_dir = "rtl"
+        html_lang = "he"
+        page_title = f"דפי פתרונות מלאים — {title} — סבב {round_num}"
+        answers_only_msg = "⚠️ דף פתרונות — למורה בלבד"
+        footer_text = f"מתמטיקה יומית — א\"ל השד\"ה | פתרונות מלאים | {title} | סבב {round_num} — © כל הזכויות שמורות"
+        prec_title_lang = '🟢 פתרונות קבוצת ניצ"ה'
+        vocab_title = "🟡 פתרונות מתמטיקה עם המורה"
+        methods_title = "🔵 מדדי הצלחה — מתמטיקה עם חבר"
+
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
-<style>{get_css('answers')}</style></head>
+<style>{get_css('answers', english_mode=english_mode, math_mode=math_mode)}</style></head>
 <body>
-{render_header(title, round_num, 'answers', include_student_bar=False, english_mode=english_mode)}
+{render_header(title, round_num, 'answers', include_student_bar=False, english_mode=english_mode, math_mode=math_mode)}
 
 <div style="background:#eaf2ff; border:2px solid #2c5aa0; border-radius:8px; padding:8px 14px; margin-bottom:14px; font-size:12px; font-weight:600; color:#1a3a6b;">
     {answers_only_msg}

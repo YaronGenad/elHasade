@@ -64,6 +64,7 @@ def _decorative_img_html(decorative_image: Optional[str]) -> str:
 
 def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
                           english_mode: bool = False,
+                          math_mode: bool = False,
                           topic_image: Optional[str] = None,
                           svg_decorative: Optional[str] = None,
                           extra_svgs: Optional[List[str]] = None,
@@ -103,6 +104,19 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
         html_lang = "en"
         page_title = f"Comprehension Station - {title} - Round {round_num}"
         footer_text = f"מחולל יחידות לימוד | Comprehension Station | {title} | Round {round_num} — {lbl['footer_copy']}"
+    elif math_mode:
+        disc_box = f"""
+        <div class="section-block" style="background:#fadbd8; border:2px solid #e74c3c; border-radius:8px; padding:10px 14px; margin-top:14px;">
+            <div style="font-weight:700; color:#c0392b; margin-bottom:6px;">✅ בדיקה עצמית — לפני שממשיכים:</div>
+            <ul style="margin:0; padding-right:20px; font-size:13px;">{disc_items}</ul>
+            <div style="font-size:11px; color:#888; margin-top:6px; font-style:italic;">* סמן/י ✓ ליד כל סעיף שבדקת — ניתן לבדוק ללא מורה!</div>
+        </div>
+        """
+        key_terms_label = "📐 מושגים מתמטיים:"
+        html_dir = "rtl"
+        html_lang = "he"
+        page_title = f"מתמטיקה בעצמי — {title} — סבב {round_num}"
+        footer_text = f"מתמטיקה יומית — א\"ל השד\"ה | מתמטיקה בעצמי | {title} | סבב {round_num} — © כל הזכויות שמורות"
     else:
         disc_box = f"""
         <div class="section-block" style="background:#fadbd8; border:2px solid #e74c3c; border-radius:8px; padding:10px 14px; margin-top:14px;">
@@ -126,13 +140,15 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
     }
     if english_mode:
         reading_instruction = ENGLISH_LABELS['reading_instr']
+    elif math_mode:
+        reading_instruction = "📌 בצע/י את המשימה באופן עצמאי. בדוק/בדקי את עצמך — ללא עזרת מורה!"
     elif is_steam:
         input_type = data.get('input_type', 'text')
         reading_instruction = input_type_labels.get(input_type, f"\U0001f4cc {gl['reading_mode']}")
     else:
         reading_instruction = f"\U0001f4cc {gl['reading_mode']}"
 
-    if not english_mode:
+    if not english_mode and not math_mode:
         footer_text = f"א\"ל השד\"ה{' STEAM' if is_steam else ''} | תחנת הבנה | {title} | סבב {round_num} — © כל הזכויות שמורות"
 
     # KWL table (STEAM only)
@@ -177,6 +193,23 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
             <div class="answer-line"></div><div class="answer-line"></div><div class="answer-line"></div>
         </div>"""
 
+    # Observation table (STEAM observation type only)
+    obs_table = data.get('observation_table', {})
+    obs_table_html = ""
+    if obs_table and data.get('is_steam') and not english_mode:
+        cols = obs_table.get('columns', [])
+        n_rows = obs_table.get('rows', 4)
+        th_html = "".join([f"<th>{c}</th>" for c in cols])
+        tr_html = "".join([
+            "<tr>" + "".join([f"<td style='height:30px;'></td>" for _ in cols]) + "</tr>"
+            for _ in range(n_rows)
+        ])
+        obs_table_html = f"""
+        <div class="section-block" style="margin-bottom:14px;">
+            <div class="section-title">👁️ {obs_table.get('title', 'טבלת תצפית מונחת')}</div>
+            <table style="margin-top:8px; width:100%;"><tr>{th_html}</tr>{tr_html}</table>
+        </div>"""
+
     # Topic image float (right side in RTL = float:left in CSS)
     image_html = ""
     if topic_image:
@@ -194,12 +227,42 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
         except Exception:
             pass
 
+    # Math-specific: traffic light + cutout cards
+    math_extra_html = ""
+    if math_mode:
+        dl = data.get('difficulty_levels', {})
+        if dl:
+            math_extra_html += f"""
+        <div class="traffic-light">
+            <div class="tl-green"><div class="tl-label">🟢 קל</div>{dl.get('green', '')}</div>
+            <div class="tl-yellow"><div class="tl-label">🟡 בינוני</div>{dl.get('yellow', '')}</div>
+            <div class="tl-red"><div class="tl-label">🔴 מאתגר</div>{dl.get('red', '')}</div>
+        </div>"""
+        if data.get('cutout_cards') and data.get('card_pairs'):
+            pairs_html = "".join([
+                f'<div style="border:2px dashed #e74c3c; border-radius:8px; display:grid; '
+                f'grid-template-columns:1fr 4px 1fr; min-height:50px; overflow:hidden; break-inside:avoid; margin-bottom:6px;">'
+                f'<div style="background:#fadbd8; display:flex; align-items:center; justify-content:center; '
+                f'font-weight:800; font-size:13px; padding:6px; text-align:center;">{p.get("term","")}</div>'
+                f'<div style="background:#c0392b;"></div>'
+                f'<div style="background:white; display:flex; align-items:center; justify-content:center; '
+                f'font-size:12px; padding:6px; text-align:center; color:#444;">{p.get("definition","")}</div>'
+                f'</div>'
+                for p in data.get('card_pairs', [])
+            ])
+            math_extra_html += f"""
+        <div class="section-block" style="margin-top:14px;">
+            <div class="section-title">✂️ כרטיסיות הברקה — גזור וסדר</div>
+            <div style="font-size:11px; color:#888; margin-bottom:8px;">✂️ גזור. הפוך כרטיסייה — מושג מצד אחד, תשובה מצד שני. בדוק עצמאית!</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">{pairs_html}</div>
+        </div>"""
+
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
-<style>{get_css('comprehension')}</style></head>
+<style>{get_css('comprehension', english_mode=english_mode, math_mode=math_mode)}</style></head>
 <body>
-{render_header(title, round_num, 'comprehension', english_mode=english_mode)}
+{render_header(title, round_num, 'comprehension', english_mode=english_mode, math_mode=math_mode)}
 <div class="instruction-box">{reading_instruction}</div>
 {image_html}
 {kwl_html}
@@ -212,6 +275,8 @@ def render_comprehension(title: str, round_num: int, data: Dict, grade: str,
     </div>
 </div>
 {written_response_html}
+{obs_table_html}
+{math_extra_html}
 {_svg_row_html(extra_svgs)}
 <div style="break-inside:avoid; page-break-inside:avoid;">
 {disc_box}

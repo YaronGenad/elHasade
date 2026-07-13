@@ -1,6 +1,6 @@
 from typing import Dict
 from ..config import STATION_COLORS
-from .css import ENGLISH_STATION_NAMES, ENGLISH_LABELS
+from .css import ENGLISH_STATION_NAMES, ENGLISH_LABELS, MATH_STATION_NAMES
 from .icons import STATION_ICONS
 from .utils import logo_data_url
 
@@ -15,9 +15,14 @@ def _get_logo() -> str:
 
 
 def render_header(title: str, round_num: int, station: str,
-                  include_student_bar: bool = True, english_mode: bool = False) -> str:
+                  include_student_bar: bool = True, english_mode: bool = False,
+                  math_mode: bool = False) -> str:
     c = STATION_COLORS[station]
-    if english_mode:
+    if math_mode:
+        mn = MATH_STATION_NAMES.get(station, {"name": c['name'], "emoji": c['emoji']})
+        station_name = mn['name']
+        round_label = f"סבב {round_num}"
+    elif english_mode:
         en = ENGLISH_STATION_NAMES.get(station, {"name": c['name'], "emoji": c['emoji']})
         station_name = en['name']
         lbl = ENGLISH_LABELS
@@ -53,16 +58,18 @@ def render_header(title: str, round_num: int, station: str,
             """
 
     title_color = c['primary']
+    _title_dir = "ltr" if english_mode else "rtl"
+    pace_badge = '<div style="font-size:8px; opacity:0.75; letter-spacing:1px; margin-top:2px;">PACE</div>' if english_mode else ''
     return f"""
     <div class="page-header">
         <div class="header-icon-circle">{svg_icon}</div>
         <div class="header-center">
             <div class="header-round-badge">{round_label}</div>
-            <div class="header-station-name">{station_name}</div>
+            <div class="header-station-name">{station_name}{pace_badge}</div>
         </div>
         {logo_img}
     </div>
     <div style="font-size:24px; font-weight:800; color:{title_color}; text-align:center;
-                margin:10px 0 6px; direction:rtl; line-height:1.3;">{title}</div>
+                margin:10px 0 6px; direction:{_title_dir}; line-height:1.3;">{title}</div>
     {student_bar}
     """

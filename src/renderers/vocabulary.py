@@ -214,8 +214,13 @@ def _render_word_search(words, english_mode=False):
 
 
 def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool = False,
+                      math_mode: bool = False,
                       topic_image: Optional[str] = None,
                       decorative_image: Optional[str] = None) -> str:
+    # ── Math עם המורה branch ───────────────────────────────────────
+    if math_mode or data.get('is_math_teacher') or data.get('activity_type') == 'math_teacher':
+        return _render_math_vocabulary(title, round_num, data, topic_image=topic_image,
+                                       decorative_image=decorative_image)
     # ── STEAM bilingual game branch ────────────────────────────────
     activity_type = str(data.get('activity_type') or data.get('game_type') or 'matching_cards')
     if activity_type.startswith('stem_') or data.get('bilingual'):
@@ -483,7 +488,7 @@ def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
-<style>{get_css('vocabulary')}</style></head>
+<style>{get_css('vocabulary', english_mode=english_mode)}</style></head>
 <body>
 {render_header(title, round_num, 'vocabulary', english_mode=english_mode)}
 <div class="instruction-box">📌 {data.get('instruction', '')}</div>
@@ -492,6 +497,122 @@ def render_vocabulary(title: str, round_num: int, data: Dict, english_mode: bool
 {_decorative_html(decorative_image)}
 {_extension_html(data.get('extension_activity', {}), english_mode=english_mode)}
 <div class="page-footer">{footer_text}</div>
+</body></html>"""
+
+
+def _render_math_vocabulary(title: str, round_num: int, data: Dict,
+                            topic_image: Optional[str] = None,
+                            decorative_image: Optional[str] = None) -> str:
+    """Renders the מתמטיקה עם המורה (acquisition) station for math mode."""
+    c = STATION_COLORS['vocabulary']
+
+    # Opening task
+    opening_html = f"""
+    <div style="background:#fef9e7; border:2px solid #f1c40f; border-radius:8px; padding:10px 14px; margin-bottom:12px;">
+        <div style="font-weight:700; color:#7d6608; margin-bottom:6px;">💛 {data.get('opening_task', '')}</div>
+    </div>""" if data.get('opening_task') else ""
+
+    # ק.צ.פ.ת model
+    ktzpt = data.get('ktzpt_model', {})
+    ktzpt_html = ""
+    if ktzpt:
+        ktzpt_html = f"""
+    <div style="background:#fef9e7; border:2px solid #f1c40f; border-radius:8px; padding:12px 14px; margin-bottom:12px;">
+        <div style="font-weight:700; color:#7d6608; margin-bottom:8px;">📋 מודל ק.צ.פ.ת — פתרון בעיות מילוליות</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12.5px;">
+            <div style="background:white; border:1.5px solid #f1c40f; border-radius:6px; padding:8px;">
+                <strong style="color:#7d6608;">ק</strong> — {ktzpt.get('k', '')}
+                <div class="answer-line" style="margin-top:6px;"></div>
+            </div>
+            <div style="background:white; border:1.5px solid #f1c40f; border-radius:6px; padding:8px;">
+                <strong style="color:#7d6608;">צ</strong> — {ktzpt.get('tz', '')}
+                <div class="answer-line" style="margin-top:6px;"></div>
+            </div>
+            <div style="background:white; border:1.5px solid #f1c40f; border-radius:6px; padding:8px;">
+                <strong style="color:#7d6608;">פ</strong> — {ktzpt.get('p', '')}
+                <div class="answer-line" style="margin-top:6px;"></div><div class="answer-line"></div>
+            </div>
+            <div style="background:white; border:1.5px solid #f1c40f; border-radius:6px; padding:8px;">
+                <strong style="color:#7d6608;">ת</strong> — {ktzpt.get('t', '')}
+                <div class="answer-line" style="margin-top:6px;"></div>
+            </div>
+        </div>
+    </div>"""
+
+    # Formula
+    formula = data.get('formula', {})
+    formula_html = ""
+    if formula:
+        formula_html = f"""
+    <div style="background:#fffde7; border:1.5px solid #f1c40f; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:12.5px;">
+        <div style="font-weight:700; color:#7d6608; margin-bottom:6px;">📐 נוסחת הצלחה (3 רכיבים חובה)</div>
+        <div style="margin-bottom:3px;"><strong>1. הוראה מפורשת:</strong> {formula.get('explicit_instruction', '')}</div>
+        <div style="margin-bottom:3px;"><strong>2. דוגמה פתורה:</strong> {formula.get('solved_example', '')}</div>
+        <div><strong>3. הכלל הגנרי:</strong> {formula.get('generic_rule', '')}</div>
+    </div>"""
+
+    # Traffic light
+    dl = data.get('difficulty_levels', {})
+    traffic_html = f"""
+    <div class="traffic-light">
+        <div class="tl-green"><div class="tl-label">🟢 קל</div>{dl.get('green', '')}</div>
+        <div class="tl-yellow"><div class="tl-label">🟡 בינוני</div>{dl.get('yellow', '')}</div>
+        <div class="tl-red"><div class="tl-label">🔴 מאתגר</div>{dl.get('red', '')}</div>
+    </div>""" if dl else ""
+
+    # "Why" question
+    why_html = ""
+    if data.get('why_question'):
+        why_html = f"""
+    <div style="background:#fef9e7; border:2px solid #f1c40f; border-radius:8px; padding:10px 14px; margin-bottom:12px;">
+        <div style="font-weight:700; color:#7d6608; margin-bottom:6px;">💭 למה? שאלת הנמקה:</div>
+        <div style="font-size:13px; margin-bottom:8px;">{data['why_question']}</div>
+        <div class="answer-line"></div><div class="answer-line"></div>
+    </div>"""
+
+    # Vocabulary words table
+    words = data.get('words', [])
+    words_html = ""
+    if words:
+        rows = "".join([
+            f"<tr><td><strong>{w.get('word','')}</strong></td><td>{w.get('definition','')}</td></tr>"
+            for w in words
+        ])
+        words_html = f"""
+    <div class="section-block" style="margin-bottom:12px;">
+        <div class="section-title">📖 מושגים מתמטיים בסבב זה:</div>
+        <table style="margin-top:8px;"><tr><th>מושג</th><th>הגדרה</th></tr>{rows}</table>
+    </div>"""
+
+    image_html = ""
+    if topic_image:
+        try:
+            from ..images import ImageService
+            img_url = ImageService.to_data_url(topic_image)
+            image_html = (
+                f'<img src="{img_url}" style="float:left; margin:0 12px 8px 0; '
+                'width:180px; height:120px; object-fit:cover; border-radius:8px; '
+                f'border:2px solid {c["border"]};" alt="">'
+            )
+        except Exception:
+            pass
+
+    return f"""<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head><meta charset="UTF-8"><title>מתמטיקה עם המורה — {title} — סבב {round_num}</title>
+<style>{get_css('vocabulary', math_mode=True)}</style></head>
+<body>
+{render_header(title, round_num, 'vocabulary', math_mode=True)}
+{image_html}
+<div class="instruction-box">📌 {data.get('instruction', '')} | נושא: {data.get('acquisition_topic', '')}</div>
+{opening_html}
+{formula_html}
+{ktzpt_html}
+{traffic_html}
+{why_html}
+{words_html}
+{_decorative_html(decorative_image)}
+<div class="page-footer">מתמטיקה יומית — א"ל השד"ה | מתמטיקה עם המורה | {title} | סבב {round_num} — © כל הזכויות שמורות</div>
 </body></html>"""
 
 

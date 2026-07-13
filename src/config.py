@@ -139,6 +139,13 @@ def needs_nikud(grade: str) -> bool:
 # ─── Curriculum Knowledge Base ───────────────────────────────────────────────
 
 _CURRICULUM_KB: Dict | None = None
+_CURRICULUM_SCIENCE: Dict | None = None
+
+_SCIENCE_KEYWORDS = (
+    "מדע", "פיזיקה", "כימיה", "ביולוגיה", "science",
+    "מדעי הטבע", "מדע וטבע", "מד' וטכ'", "מדעי הסביבה",
+    "אסטרונומיה", "גיאולוגיה", "טכנולוגיה", "הנדסה",
+)
 
 
 def _load_curriculum_kb() -> Dict:
@@ -153,9 +160,35 @@ def _load_curriculum_kb() -> Dict:
     return _CURRICULUM_KB
 
 
+def _load_curriculum_science() -> Dict:
+    global _CURRICULUM_SCIENCE
+    if _CURRICULUM_SCIENCE is None:
+        path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'curriculum_science.json'))
+        try:
+            with open(path, encoding='utf-8') as f:
+                _CURRICULUM_SCIENCE = json.load(f)
+        except Exception:
+            _CURRICULUM_SCIENCE = {}
+    return _CURRICULUM_SCIENCE
+
+
+_CURRICULUM_ENGLISH: Dict | None = None
+
+
+def _load_curriculum_english() -> Dict:
+    global _CURRICULUM_ENGLISH
+    if _CURRICULUM_ENGLISH is None:
+        path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'curriculum_english.json'))
+        try:
+            with open(path, encoding='utf-8') as f:
+                _CURRICULUM_ENGLISH = json.load(f)
+        except Exception:
+            _CURRICULUM_ENGLISH = {}
+    return _CURRICULUM_ENGLISH
+
+
 def _subject_to_domain(subject: str) -> str:
     """Map a free-text subject string to a curriculum_kb domain key."""
-    # Import here to avoid circular import; is_stem/is_english defined below
     s = subject.lower()
     if any(k in s for k in ("היסטוריה", "history", "אזרחות", "גיאוגרפיה", "geography")):
         return "history"
@@ -163,8 +196,7 @@ def _subject_to_domain(subject: str) -> str:
         return "english"
     if any(k in s for k in ("מתמטיקה", "חשבון", "math", "אלגברה", "גיאומטריה")):
         return "math"
-    if any(k in s for k in ("מדע", "פיזיקה", "כימיה", "ביולוגיה", "science",
-                             "מדעי הטבע", "מדע וטבע", "מד' וטכ'")):
+    if any(k in s for k in _SCIENCE_KEYWORDS):
         return "science"
     return "hebrew"
 
@@ -173,12 +205,25 @@ def get_curriculum_profile(grade: str, subject: str) -> Dict:
     """Return the curriculum knowledge profile for this grade band + subject.
 
     Returns an empty dict if no data is available — callers must handle that.
+    Science subjects use per-grade data from curriculum_science.json (grades א-ו).
+    All other subjects fall back to curriculum_kb.json (grade-band granularity).
     """
+    g = grade.replace("׳", "").replace("'", "").strip()
+    domain = _subject_to_domain(subject)
+
+    if domain == "english":
+        eng = _load_curriculum_english()
+        if g in eng:
+            return eng[g]
+
+    if domain == "science":
+        sci = _load_curriculum_science()
+        if g in sci:
+            return sci[g]
+
     kb = _load_curriculum_kb()
-    g = grade.replace("׳", "").replace("'", "")
     band = _GRADE_MAP.get(g, "ז-ח")
     band_data = kb.get(band, {})
-    domain = _subject_to_domain(subject)
     return band_data.get(domain, band_data.get("hebrew", {}))
 
 
@@ -210,7 +255,10 @@ _NON_STEM_SUBJECTS = {
 }
 
 ENGLISH_SUBJECTS = {
-    "אנגלית", "english", "English", "אנגלית כשפה זרה", "EFL", "ESL",
+    "אנגלית", "אנגלי", "english", "English",
+    "אנגלית כשפה זרה", "אנגלית כשפה שנייה",
+    "שפה אנגלית", "לשון אנגלית",
+    "EFL", "ESL", "PACE",
 }
 
 
@@ -225,6 +273,20 @@ def is_stem(subject: str) -> bool:
 def is_english(subject: str) -> bool:
     """Returns True when the subject is English — output will be fully in English."""
     return any(s.lower() in subject.lower() for s in ENGLISH_SUBJECTS)
+
+
+# ─── MATH (מתמטיקה יומית) ────────────────────────────────────────────────────
+
+MATH_SUBJECTS = {
+    "מתמטיקה", "חשבון", "גיאומטריה", "אלגברה", "חשבון ואלגברה",
+    "סטטיסטיקה", "הסתברות", "טריגונומטריה", "אנליזה",
+    "math", "mathematics", "geometry", "algebra", "statistics",
+}
+
+
+def is_math(subject: str) -> bool:
+    """Returns True when the subject calls for the מתמטיקה יומית edition."""
+    return any(s.lower() in subject.lower() for s in MATH_SUBJECTS)
 
 
 # ─── ENGLISH GRADE LEVELS ────────────────────────────────────────────────────
@@ -257,7 +319,7 @@ ENGLISH_GRADE_LEVELS: Dict = {
     },
     "ה-ו": {
         "age": "10-12",
-        "cefr": "A2",
+        "cefr": "A1",
         "language": "short paragraphs, familiar topics, present and past tense",
         "reading_mode": "Silent reading + pair discussion + summary",
         "dictation_words": 12,
@@ -309,6 +371,18 @@ ENGLISH_GRADE_LEVELS: Dict = {
 def get_english_grade_level(grade: str) -> Dict:
     """Returns English-specific grade level settings."""
     g = grade.replace("׳", "").replace("'", "")
+    if g == "ג":  # Grade 3 = Pre-A1 per MoE 2020, not grouped with grade 4 A1
+        return {
+            "age": "8-9", "cefr": "Pre-A1",
+            "language": "phonics-based: CVC/CVCE words, sight words, short supported sentences",
+            "reading_mode": "Paired reading with picture support + oral retell",
+            "dictation_words": 5,
+            "text_length": "80-130 words",
+            "comprehension_options": ["picture-based WH questions", "yes/no oral", "point and say", "sentence starters"],
+            "methods_options": ["label a picture", "fill-in-the-blank 1-2 words", "copy and draw", "simple sentence frame"],
+            "precision_options": ["spell 5 phonics words", "match word to picture", "circle correct word", "phonics sorting (sh/ch/th)"],
+            "vocabulary_options": ["word-picture matching", "flashcard memory game", "draw and label", "word-picture sort"],
+        }
     band = _GRADE_MAP.get(g, "ז-ח")
     return ENGLISH_GRADE_LEVELS.get(band, ENGLISH_GRADE_LEVELS["ז-ח"])
 

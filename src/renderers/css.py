@@ -5,12 +5,21 @@ from ..config import STATION_COLORS, get_grade_level, is_english as _is_english_
 
 # ─── English-mode UI labels ──────────────────────────────────────────────────
 ENGLISH_STATION_NAMES = {
-    "comprehension": {"name": "Comprehension Station", "emoji": "\U0001f534"},
-    "methods":       {"name": "Methods Station",       "emoji": "\U0001f535"},
-    "precision":     {"name": "Precision Station",     "emoji": "\U0001f7e2"},
-    "vocabulary":    {"name": "Vocabulary Station",    "emoji": "\U0001f7e1"},
-    "teacher":       {"name": "Teacher Preparation",   "emoji": "\U0001f4cb"},
-    "answers":       {"name": "Answer Key",            "emoji": "\U0001f511"},
+    "comprehension": {"name": "Conception",           "emoji": "\U0001f534"},
+    "methods":       {"name": "Articulateness",       "emoji": "\U0001f535"},
+    "precision":     {"name": "Precision",            "emoji": "\U0001f7e2"},
+    "vocabulary":    {"name": "Enhancing Vocabulary", "emoji": "\U0001f7e1"},
+    "teacher":       {"name": "Teacher Preparation",  "emoji": "\U0001f4cb"},
+    "answers":       {"name": "Answer Key",           "emoji": "\U0001f511"},
+}
+
+MATH_STATION_NAMES = {
+    "comprehension": {"name": "מתמטיקה בעצמי",              "emoji": "\U0001f534"},
+    "methods":       {"name": "מתמטיקה עם חבר",             "emoji": "\U0001f535"},
+    "precision":     {"name": 'קבוצת ניצ"ה — נצא מהקופסה',  "emoji": "\U0001f7e2"},
+    "vocabulary":    {"name": "מתמטיקה עם המורה",            "emoji": "\U0001f7e1"},
+    "teacher":       {"name": "מדריך הכנה למורה",            "emoji": "\U0001f4cb"},
+    "answers":       {"name": "דפי פתרונות מלאים",           "emoji": "\U0001f511"},
 }
 
 ENGLISH_LABELS = {
@@ -30,9 +39,9 @@ ENGLISH_LABELS = {
     "writing_title":   "\u270f\ufe0f Write here:",
     "scaffold_title":  "\U0001f4dd Writing Structure (scaffold)",
     "guiding_title":   "\u2753 Guiding Questions",
-    "traffic_green":   "\U0001f7e2 Basic",
-    "traffic_yellow":  "\U0001f7e1 Regular",
-    "traffic_red":     "\U0001f534 Challenge",
+    "traffic_green":   "\U0001f7e2",
+    "traffic_yellow":  "\U0001f7e1",
+    "traffic_red":     "\U0001f534",
     "scissors":        "\u2702\ufe0f Cut out all cards, shuffle, and match each word to its definition",
     "word_bank":       "\U0001f4da Word Bank:",
     "footer_copy":     "\u00a9 All rights reserved",
@@ -45,14 +54,15 @@ ENGLISH_LABELS = {
 }
 
 
-def get_css(station: str = "comprehension") -> str:
+def get_css(station: str = "comprehension", english_mode: bool = False, math_mode: bool = False) -> str:
     c = STATION_COLORS[station]
+    direction = "ltr" if english_mode else "rtl"
     return f"""
     @page {{ size: A4; margin: 10mm; }}
     * {{ box-sizing: border-box; }}
     body {{
         font-family: 'Arial Hebrew', Arial, 'Segoe UI', sans-serif;
-        direction: rtl;
+        direction: {direction};
         line-height: 1.9;
         color: #1e2a3a;
         background: white;

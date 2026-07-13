@@ -2,8 +2,9 @@ from typing import Dict
 from .css import get_css
 
 
-def render_roadmap(title: str, roadmap: Dict, english_mode: bool = False) -> str:
+def render_roadmap(title: str, roadmap: Dict, english_mode: bool = False, math_mode: bool = False) -> str:
     is_steam = roadmap.get('is_steam', False)
+    is_math = math_mode or roadmap.get('is_math', False)
     goals_raw = roadmap.get('learning_goals', [])
     # learning_goals can be a list or a dict with knowledge/skills/values
     if isinstance(goals_raw, dict):
@@ -16,23 +17,41 @@ def render_roadmap(title: str, roadmap: Dict, english_mode: bool = False) -> str
     ])
 
     # Adapt column headers + central line based on mode
-    if english_mode:
+    if is_math:
+        col1_header = "סבב"
+        comp_header = "🔴 מתמטיקה בעצמי<br><small>(עצמאי, קינסטטי, שיום וזיהוי)</small>"
+        col2_header = "🔵 מתמטיקה עם חבר<br><small>(זוגי, אלגוריתמי, משחק)</small>"
+        col3_header = '🟢 קבוצת ניצ"ה<br><small>(תהליכי, עולם אמיתי, בעיות רב-שלביות)</small>'
+        col4_header = "🟡 מתמטיקה עם המורה<br><small>(הקנייה בלבד, הנמקה — למה?)</small>"
+        central_line = f"<strong>ציר הנדבכיות:</strong> {roadmap.get('layering_axis', '')} | <strong>עיגון תוכנית לימודים:</strong> {roadmap.get('curriculum_anchor', '')}"
+        mode_badge = '<span style="background:#1e8449; color:white; padding:3px 12px; border-radius:14px; font-size:12px; margin-right:8px;">מתמטיקה יומית</span>'
+        iron_rule = 'כל 4 תחנות בכל סבב הן <strong>עצמאיות לחלוטין (STAND-ALONE)</strong>. ⚠️ הקנייה — <strong>תחנת המורה בלבד</strong>. הסבב האחרון = מדידה, בקרה והערכה תמיד.'
+        goals_label = "מטרות הלמידה:"
+        rounds_label = "סבב"
+        iron_label = "⚡ חוקי ברזל:"
+        html_dir = "rtl"
+        html_lang = "he"
+        page_title = f"מתמטיקה יומית — {title}"
+        footer_text = f"מתמטיקה יומית — א\"ל השד\"ה | מפת דרכים | {title} — © כל הזכויות שמורות"
+        method_label = "מתמטיקה יומית — א\"ל השד\"ה"
+        rounds_count_label = "סבבים"
+    elif english_mode:
         col1_header = "Round"
-        col2_header = "🔵 Methods Station<br><small>(structured writing)</small>"
-        col3_header = "🟢 Precision Station<br><small>(spelling & grammar)</small>"
-        col4_header = "🟡 Vocabulary Station<br><small>(printed/hands-on activity)</small>"
-        comp_header = "🔴 Comprehension Station<br><small>(text + oral discussion)</small>"
+        comp_header = "🔴 Conception<br><small>(text + oral discussion only — no writing)</small>"
+        col2_header = "🔵 Articulateness<br><small>(guided writing — teacher present)</small>"
+        col3_header = "🟢 Precision<br><small>(game-based spelling & grammar)</small>"
+        col4_header = "🟡 Enhancing Vocabulary<br><small>(physical/hands-on creation)</small>"
         central_line = f"<strong>Central text type:</strong> {roadmap.get('central_text_type', '')} | <strong>Language focus:</strong> {roadmap.get('language_focus', '')}"
-        mode_badge = '<span style="background:#1a5276; color:white; padding:3px 12px; border-radius:14px; font-size:12px; margin-right:8px;">🇬🇧 English Edition</span>'
-        iron_rule = "All 4 stations in every round are <strong>fully independent (STAND-ALONE)</strong> — a student can start at any station without depending on the others."
+        mode_badge = '<span style="background:#1a5276; color:white; padding:3px 12px; border-radius:14px; font-size:12px; margin-right:8px;">PACE</span>'
+        iron_rule = "All 4 stations in every round are <strong>fully independent (STAND-ALONE)</strong>. ⚠️ Conception = ORAL ONLY, zero writing ever."
         goals_label = "Learning Goals:"
         rounds_label = "Round"
-        iron_label = "⚡ Iron Rule:"
+        iron_label = "⚡ PACE Iron Rule:"
         html_dir = "ltr"
         html_lang = "en"
-        page_title = f"Unit Roadmap - {title}"
-        footer_text = f"מחולל יחידות לימוד | Unit Roadmap | {title} — © All rights reserved"
-        method_label = "שיטת א\"ל השד\"ה"
+        page_title = f"PACE Unit Roadmap — {title}"
+        footer_text = f"PACE — The New Steps of Literacy | {title} — © All rights reserved"
+        method_label = "PACE — The New Steps of Literacy"
         rounds_count_label = "rounds"
     elif is_steam:
         col1_header = "סבב"
@@ -75,19 +94,31 @@ def render_roadmap(title: str, roadmap: Dict, english_mode: bool = False) -> str
     rounds_html = ""
     for r in roadmap.get('rounds', []):
         rn = r.get('round', '')
-        comp = r.get('comprehension', {})
-        meth = r.get('methods', {})
-        prec = r.get('precision', {})
-        vocab = r.get('vocabulary', {})
+        if is_math:
+            comp = r.get('myself', r.get('comprehension', {}))
+            meth = r.get('friend', r.get('methods', {}))
+        elif english_mode:
+            comp = r.get('conception', r.get('comprehension', {}))
+            meth = r.get('articulateness', r.get('methods', {}))
+        else:
+            comp = r.get('comprehension', {})
+            meth = r.get('methods', {})
+        if is_math:
+            prec = r.get('nitzah', r.get('precision', {}))
+            vocab = r.get('teacher', r.get('vocabulary', {}))
+        else:
+            prec = r.get('precision', {})
+            vocab = r.get('vocabulary', {})
 
-        comp_type = comp.get('input_type') or comp.get('text_type', '')
-        meth_type = meth.get('thinking_framework') or meth.get('writing_type', '')
+        layer_label = r.get('layer_label', '')
+        comp_type = comp.get('task_type') or comp.get('input_type') or comp.get('text_type', '')
+        meth_type = meth.get('task_type') or meth.get('thinking_framework') or meth.get('writing_strategy') or meth.get('writing_type', '')
         prec_type = prec.get('hands_on_type') or prec.get('activity_type', '')
         vocab_type = vocab.get('game_type') or vocab.get('activity_type', '')
 
         rounds_html += f"""
         <tr>
-            <td style="font-weight:800; text-align:center; background:#f8f9fa; font-size:14px;">{rounds_label} {rn}</td>
+            <td style="font-weight:800; text-align:center; background:#f8f9fa; font-size:14px;">{rounds_label} {rn}{"<br><small style='font-size:9px;color:#666;font-weight:600;'>"+layer_label+"</small>" if layer_label else ""}</td>
             <td style="background:#fadbd8;">
                 <div style="font-weight:700; color:#c0392b; font-size:11px;">🔴 {comp_type}</div>
                 <div style="font-size:11.5px; margin-top:3px;">{comp.get('description', '')}</div>
@@ -110,7 +141,7 @@ def render_roadmap(title: str, roadmap: Dict, english_mode: bool = False) -> str
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
-<style>{get_css('teacher')}
+<style>{get_css('teacher', english_mode=english_mode, math_mode=is_math)}
 .roadmap-table {{ width:100%; border-collapse:collapse; }}
 .roadmap-table th {{ background:#4a235a; color:white; padding:10px 12px; font-size:13px; }}
 .roadmap-table td {{ border:1.5px solid #ddd; padding:10px 12px; vertical-align:top; }}

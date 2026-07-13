@@ -68,6 +68,7 @@ def _self_review_html(checklist: list, english_mode: bool = False) -> str:
 
 
 def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = False,
+                   math_mode: bool = False,
                    topic_image: Optional[str] = None,
                    svg_decorative: Optional[str] = None,
                    extra_svgs: Optional[List[str]] = None) -> str:
@@ -96,6 +97,23 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
         html_lang = "en"
         page_title = f"Methods Station - {title} - Round {round_num}"
         list_padding = "padding-left:20px;"
+    elif math_mode:
+        traffic = f"""
+        <div class="traffic-light">
+            <div class="tl-green"><div class="tl-label">🟢 קל</div>{dl.get('green', '')}</div>
+            <div class="tl-yellow"><div class="tl-label">🟡 בינוני</div>{dl.get('yellow', '')}</div>
+            <div class="tl-red"><div class="tl-label">🔴 מאתגר</div>{dl.get('red', '')}</div>
+        </div>
+        """
+        scope_label = "סבבי משחק:"
+        guiding_title = "❓ שאלות לשיח בין החברים"
+        scaffold_title = "🎮 מבנה המשחק"
+        write_title = "✏️ רשום/רשמי פה:"
+        footer_text = f"מתמטיקה יומית — א\"ל השד\"ה | מתמטיקה עם חבר | {title} | סבב {round_num} — © כל הזכויות שמורות"
+        html_dir = "rtl"
+        html_lang = "he"
+        page_title = f"מתמטיקה עם חבר — {title} — סבב {round_num}"
+        list_padding = "padding-right:20px;"
     else:
         traffic = f"""
         <div class="traffic-light">
@@ -145,6 +163,8 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
     if english_mode:
         scaffold_title = "\U0001f4dd Writing Structure (scaffold)"
         write_title = "✏️ Write here:"
+    elif math_mode:
+        pass  # scaffold_title / write_title / footer_text already set above
     elif is_steam:
         scaffold_title = "\U0001f4dd מסגרת / פיגום לחשיבה"
         write_title = "✏️ כתוב/כתבי את הניתוח/הדוח/הפתרון:"
@@ -153,6 +173,21 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
         scaffold_title = "\U0001f4dd מבנה הכתיבה (פיגום)"
         write_title = "✏️ כתוב/כתבי כאן:"
         footer_text = f"א\"ל השד\"ה | תחנת שיטות | {title} | סבב {round_num} — © כל הזכויות שמורות"
+
+    # Math pair-roles box
+    pair_roles_html = ""
+    if math_mode:
+        pr = data.get('pair_roles', {})
+        if pr:
+            pair_roles_html = f"""
+<div style="background:#d6eaf8; border:2px solid #2980b9; border-radius:8px; padding:10px 14px; margin-bottom:12px;">
+    <div style="font-weight:700; color:#1a5276; margin-bottom:6px;">👥 תפקידים במשחק הזוגי:</div>
+    <div style="font-size:13px;">
+        <div style="margin-bottom:4px;"><strong>🔵 {pr.get('role_a', '')}</strong></div>
+        <div style="margin-bottom:4px;"><strong>🔵 {pr.get('role_b', '')}</strong></div>
+        <div style="font-size:11.5px; color:#555; font-style:italic;">{pr.get('switch', '')}</div>
+    </div>
+</div>"""
 
     # Topic image float
     image_html = ""
@@ -174,9 +209,9 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
 <head><meta charset="UTF-8"><title>{page_title}</title>
-<style>{get_css('methods')}</style></head>
+<style>{get_css('methods', english_mode=english_mode, math_mode=math_mode)}</style></head>
 <body>
-{render_header(title, round_num, 'methods', english_mode=english_mode)}
+{render_header(title, round_num, 'methods', english_mode=english_mode, math_mode=math_mode)}
 {image_html}
 <div class="instruction-box">\U0001f4cc {data.get('main_instruction', '')}</div>
 
@@ -184,6 +219,7 @@ def render_methods(title: str, round_num: int, data: Dict, english_mode: bool = 
     <div style="font-weight:700; font-size:14px; color:#1a5276; margin-bottom:6px;">✏️ {data.get('context_prompt', '')}</div>
     <div style="font-size:12px; color:#555;">{scope_label} {data.get('words_range', '')}</div>
 </div>
+{pair_roles_html}
 
 {fw_steps_html}
 {context_html}

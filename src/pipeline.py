@@ -8,7 +8,7 @@ import structlog
 from .gemini import call_gemini
 from .exceptions import LLMAPIError, PDFRenderError, CostLimitExceededError
 from .config import (
-    is_stem, is_english, SAFE_NAME_MAX_LENGTH, DEFAULT_ROUNDS,
+    is_stem, is_english, is_math, SAFE_NAME_MAX_LENGTH, DEFAULT_ROUNDS,
     GEMINI_FLASH_INPUT_COST_PER_1M, GEMINI_FLASH_OUTPUT_COST_PER_1M,
     GEMINI_MAX_COST_PER_GENERATION_USD,
 )
@@ -37,6 +37,13 @@ from .prompts import (
     build_english_precision_prompt,
     build_english_vocabulary_prompt,
     build_english_teacher_prep_prompt,
+    # Math edition
+    build_math_roadmap_prompt,
+    build_math_comprehension_prompt,
+    build_math_methods_prompt,
+    build_math_precision_prompt,
+    build_math_vocabulary_prompt,
+    build_math_teacher_prep_prompt,
 )
 from .renderers import (
     render_roadmap,
@@ -59,16 +66,21 @@ def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> 
     log.info("roadmap_start", topic=topic, subject=subject, grade=grade, rounds=rounds)
 
     provider = _PROVIDER_LABEL
-    steam_mode = user_input.get("include_stem", False)
+    math_mode = is_math(subject)
+    steam_mode = user_input.get("include_stem", False) and not math_mode
     english_mode = is_english(subject)
-    if steam_mode:
+    if math_mode:
+        mode_label = "Math"
+    elif steam_mode:
         mode_label = "STEAM"
     elif english_mode:
         mode_label = "English"
     else:
         mode_label = "Language"
     log.info("roadmap_calling_llm", provider=provider, mode=mode_label)
-    if steam_mode:
+    if math_mode:
+        roadmap_prompt_fn = build_math_roadmap_prompt
+    elif steam_mode:
         roadmap_prompt_fn = build_stem_roadmap_prompt
     elif english_mode:
         roadmap_prompt_fn = build_english_roadmap_prompt
@@ -76,6 +88,8 @@ def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> 
         roadmap_prompt_fn = build_roadmap_prompt
     try:
         roadmap, roadmap_usage = call_gemini(roadmap_prompt_fn(subject, topic, grade, rounds))
+        if math_mode:
+            roadmap['is_math'] = True
         log.info("roadmap_llm_done", input_tokens=roadmap_usage["input_tokens"], output_tokens=roadmap_usage["output_tokens"])
     except Exception as exc:
         log.error("roadmap_llm_failed", topic=topic, error=str(exc))
@@ -93,8 +107,9 @@ def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> 
             detail=str(exc),
         ) from exc
 
-    safe_name = topic.replace(" ", "_").replace("/", "_")[:SAFE_NAME_MAX_LENGTH]
-    roadmap_html = render_roadmap(topic, roadmap, english_mode=english_mode)
+    grade_tag = grade.replace(" ", "")
+    safe_name = f"{topic}_כיתה{grade_tag}".replace(" ", "_").replace("/", "_")[:SAFE_NAME_MAX_LENGTH]
+    roadmap_html = render_roadmap(topic, roadmap, english_mode=english_mode, math_mode=math_mode)
     roadmap_path = f"{output_dir}/{safe_name}_roadmap.html"
     try:
         save_html(roadmap_html, roadmap_path)
@@ -138,9 +153,12 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
 
     round_plan = rounds_list[round_num - 1]
 
-    steam_mode = user_input.get("include_stem", False)
+    math_mode = is_math(subject)
+    steam_mode = user_input.get("include_stem", False) and not math_mode
     english_mode = is_english(subject)
-    if steam_mode:
+    if math_mode:
+        mode_label = "Math"
+    elif steam_mode:
         mode_label = "STEAM"
     elif english_mode:
         mode_label = "English"
@@ -163,7 +181,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     round_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
 
     # Pre-fetch topic images (Pexels first, Imagen fallback); instant if cached
-    if not english_mode:
+    if not english_mode and not math_mode:
         _img = ImageService()
         topic_images = {
             "comprehension": None,   # fetched after LLM generates content with story context
@@ -269,9 +287,11 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
                 detail=str(exc),
             ) from exc
 
-    # Station 1: Comprehension
+    # Station 1: Comprehension / מתמטיקה בעצמי
     log.info("station_start", station="comprehension", step="1/4", round=round_num)
-    if steam_mode:
+    if math_mode:
+        comp_prompt_fn = build_math_comprehension_prompt
+    elif steam_mode:
         comp_prompt_fn = build_stem_comprehension_prompt
     elif english_mode:
         comp_prompt_fn = build_english_comprehension_prompt
@@ -284,7 +304,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_complete", station="comprehension", words=word_count, paragraphs=len(comp_data.get('paragraphs', [])))
     prev_texts.append(comp_data.get('section_title', '') + ": " + comp_data.get('intro_sentence', ''))
     content['comprehension'] = comp_data
-    if not english_mode:
+    if not english_mode and not math_mode:
         _comp_hint = f"{comp_data.get('section_title', '')} {comp_data.get('intro_sentence', '')}"
         topic_images["comprehension"] = _img.fetch(topic, grade, "comprehension", round_num,
                                                   hint=_comp_hint, used_image_keys=used_image_keys)
@@ -297,7 +317,8 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
             if _better:
                 topic_images[_st] = _better
     comp_html = _render("comprehension", render_comprehension, topic, round_num, comp_data, grade,
-                        english_mode=english_mode, topic_image=topic_images["comprehension"],
+                        english_mode=english_mode, math_mode=math_mode,
+                        topic_image=topic_images["comprehension"],
                         svg_decorative=svg_images.get("comprehension"),
                         extra_svgs=extra_svgs_map.get("comprehension", []),
                         decorative_image=topic_images.get("comprehension"))
@@ -305,15 +326,19 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     _save(comp_html, comp_path, "comprehension")
     files['comprehension'] = comp_path
 
-    # Station 2: Methods
-    if steam_mode:
+    # Station 2: Methods / מתמטיקה עם חבר
+    if math_mode:
+        meth_label = 'pair game (math)'
+    elif steam_mode:
         meth_label = 'procedural thinking'
     elif english_mode:
         meth_label = 'English writing'
     else:
         meth_label = 'writing'
     log.info("station_start", station="methods", step="2/4", round=round_num, label=meth_label)
-    if steam_mode:
+    if math_mode:
+        meth_prompt_fn = build_math_methods_prompt
+    elif steam_mode:
         meth_prompt_fn = build_stem_methods_prompt
     elif english_mode:
         meth_prompt_fn = build_english_methods_prompt
@@ -325,15 +350,18 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_complete", station="methods", writing_type=meth_data.get('writing_type', ''), levels=list(meth_data.get('difficulty_levels', {}).keys()))
     content['methods'] = meth_data
     meth_html = _render("methods", render_methods, topic, round_num, meth_data,
-                        english_mode=english_mode, topic_image=topic_images["methods"],
+                        english_mode=english_mode, math_mode=math_mode,
+                        topic_image=topic_images["methods"],
                         svg_decorative=svg_images.get("methods"),
                         extra_svgs=extra_svgs_map.get("methods", []))
     meth_path = f"{output_dir}/{safe_name}_round{round_num}_methods.html"
     _save(meth_html, meth_path, "methods")
     files['methods'] = meth_path
 
-    # Station 3: Precision (language grammar / STEM hands-on / English accuracy)
-    if steam_mode:
+    # Station 3: Precision / קבוצת ניצ"ה
+    if math_mode:
+        prec_label = 'multi-step real-world problems (ניצ"ה)'
+    elif steam_mode:
         prec_label = 'hands-on lab'
     elif english_mode:
         prec_label = 'English language accuracy tasks'
@@ -341,7 +369,9 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
         prec_label = 'precision tasks (language)'
     log.info("station_start", station="precision", step="3/4", round=round_num, label=prec_label)
     key_terms = comp_data.get('all_key_terms', [])
-    if steam_mode:
+    if math_mode:
+        prec_prompt_fn = build_math_precision_prompt
+    elif steam_mode:
         prec_prompt_fn = build_stem_precision_prompt
     elif english_mode:
         prec_prompt_fn = build_english_precision_prompt
@@ -353,14 +383,17 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_complete", station="precision", dictation_words=len(prec_data.get('dictation_list', [])), exercises=len(prec_data.get('exercises', [])))
     content['precision'] = prec_data
     prec_html = _render("precision", render_precision, topic, round_num, prec_data,
-                        english_mode=english_mode, topic_image=topic_images["precision"],
+                        english_mode=english_mode, math_mode=math_mode,
+                        topic_image=topic_images["precision"],
                         decorative_image=decorative_images.get("precision") or svg_images.get("precision"))
     prec_path = f"{output_dir}/{safe_name}_round{round_num}_precision.html"
     _save(prec_html, prec_path, "precision")
     files['precision'] = prec_path
 
-    # Station 4: Vocabulary (language / STEAM bilingual games / English vocabulary)
-    if steam_mode:
+    # Station 4: Vocabulary / מתמטיקה עם המורה
+    if math_mode:
+        vocab_label = 'teacher acquisition (מתמטיקה עם המורה)'
+    elif steam_mode:
         vocab_label = 'game (STEAM bilingual)'
     elif english_mode:
         vocab_label = 'English vocabulary activity'
@@ -369,7 +402,9 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_start", station="vocabulary", step="4/4", round=round_num, label=vocab_label)
     vocab_key = 'game_type' if steam_mode else 'activity_type'
     used_vocab_types = [r.get('vocabulary', {}).get(vocab_key, '') for r in rounds_list[:round_num - 1]]
-    if steam_mode:
+    if math_mode:
+        vocab_prompt_fn = build_math_vocabulary_prompt
+    elif steam_mode:
         vocab_prompt_fn = build_stem_vocabulary_prompt
     elif english_mode:
         vocab_prompt_fn = build_english_vocabulary_prompt
@@ -381,7 +416,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     log.info("station_complete", station="vocabulary", activity_type=vocab_data.get('activity_type', ''), title=vocab_data.get('title', ''))
     content['vocabulary'] = vocab_data
     vocab_html = _render("vocabulary", render_vocabulary, topic, round_num, vocab_data,
-                         english_mode=english_mode,
+                         english_mode=english_mode, math_mode=math_mode,
                          topic_image=topic_images.get("vocabulary"),
                          decorative_image=decorative_images.get("vocabulary") or svg_images.get("vocabulary"))
     vocab_path = f"{output_dir}/{safe_name}_round{round_num}_vocabulary.html"
@@ -390,7 +425,9 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
 
     # Teacher Prep
     log.info("station_start", station="teacher_prep", round=round_num)
-    if steam_mode:
+    if math_mode:
+        teacher_prep_fn = build_math_teacher_prep_prompt
+    elif steam_mode:
         teacher_prep_fn = build_stem_teacher_prep_prompt
     elif english_mode:
         teacher_prep_fn = build_english_teacher_prep_prompt
@@ -399,7 +436,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     teacher_data = _call_llm(teacher_prep_fn(subject, topic, grade, round_num, content), "teacher_prep")
     content['teacher'] = teacher_data
     teacher_html = _render("teacher_prep", render_teacher_prep, topic, round_num, teacher_data,
-                           content, english_mode=english_mode)
+                           content, english_mode=english_mode, math_mode=math_mode)
     teacher_path = f"{output_dir}/{safe_name}_round{round_num}_teacher_prep.html"
     _save(teacher_html, teacher_path, "teacher_prep")
     files['teacher_prep'] = teacher_path
@@ -407,7 +444,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     # Answer Key
     log.info("station_start", station="answer_key", round=round_num)
     answers_html = _render("answer_key", render_answer_key, topic, round_num, prec_data,
-                           vocab_data, meth_data, english_mode=english_mode)
+                           vocab_data, meth_data, english_mode=english_mode, math_mode=math_mode)
     answers_path = f"{output_dir}/{safe_name}_round{round_num}_answer_key.html"
     _save(answers_html, answers_path, "answer_key")
     files['answer_key'] = answers_path
