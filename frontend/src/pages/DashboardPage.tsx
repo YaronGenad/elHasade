@@ -142,7 +142,7 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* Empty state */}
-      {!isLoading && data && data.generations.length === 0 && (
+      {!isLoading && data && data.generations.filter((g) => g.status !== 'failed').length === 0 && (
         <Card>
           <CardContent
             sx={{
@@ -173,7 +173,7 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* Generations table */}
-      {!isLoading && data && data.generations.length > 0 && (
+      {!isLoading && data && data.generations.filter((g) => g.status !== 'failed').length > 0 && (
         <>
           <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
             <Table>
@@ -192,7 +192,7 @@ export const DashboardPage: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.generations.map((gen) => (
+                {data.generations.filter((gen) => gen.status !== 'failed').map((gen) => (
                   <TableRow
                     key={gen.generation_id}
                     hover
