@@ -199,7 +199,11 @@ def build_stem_comprehension_prompt(subject: str, topic: str, grade: str,
     "שאלת ניסוי: מה היית רוצה לבדוק? מה ההשערה שלך?",
     "שאלת מתמטית: מה ניתן לכמת? אילו נתונים חסרים?",
     "שאלת אנגלית מדעית: מה המונח המדעי? כיצד אומרים זאת באנגלית?"
-  ]
+  ],
+  "discussion_notes": [
+    {{"question": "שאלת חקירה מה-discussion_starters", "key_ideas": "ממצאים/מושגים מדעיים צפויים שצריך לשמוע בדיון — למורה בלבד"}}
+  ],
+  "written_response_model": "דוגמה לתשובה כתובה מלאה לשאלת ה-written_response (1-3 משפטים מנוסחים היטב)"
 }}"""
 
 
@@ -275,7 +279,8 @@ def build_stem_methods_prompt(subject: str, topic: str, grade: str,
   }},
   "words_range": "X-Y מילים / משפטים / פריטים",
   "lines_needed": 12,
-  "success_criteria": ["קריטריון 1", "קריטריון 2", "קריטריון 3"]
+  "success_criteria": ["קריטריון 1", "קריטריון 2", "קריטריון 3"],
+  "sample_work": "דוגמה לניתוח/תהליך חשיבה מלא לפי המסגרת שנבחרה — פתרון לדוגמה ברמה גבוהה"
 }}"""
 
 

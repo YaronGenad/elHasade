@@ -266,6 +266,9 @@ def build_comprehension_prompt(subject: str, topic: str, grade: str,
     "שאלת דילמה / ערך / קונפליקט",
     "שאלה פתוחה להרחבה",
     "שאלת סיכום והפנמה"
+  ],
+  "discussion_notes": [
+    {{"question": "שאלת הדיון שנשאלת", "key_ideas": "נקודות מפתח ורעיונות שצפויים לצוף בדיון — למורה בלבד"}}
   ]
 }}"""
 
@@ -350,6 +353,7 @@ def build_methods_prompt(subject: str, topic: str, grade: str,
   "words_range": "X-Y מילים",
   "lines_needed": 10,
   "success_criteria": ["קריטריון 1", "קריטריון 2", "קריטריון 3"],
+  "model_answer": "דוגמה לתשובה מיטבית מלאה — פסקה שלמה לפי מבנה סוג הכתיבה שנבחר, ברמת שפה מתאימה לכיתה",
   "self_review_checklist": [
     "בדקתי: יש לי פתיחה/מבוא",
     "בדקתי: השתמשתי ב-2 מונחים לפחות מהטקסט",

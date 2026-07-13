@@ -206,9 +206,10 @@ def render_teacher_prep(title: str, round_num: int, data: Dict, content: Dict,
 
 
 def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_data: Dict,
-                       methods_data: Dict, english_mode: bool = False,
-                       math_mode: bool = False) -> str:
+                       methods_data: Dict, comp_data: Dict = None,
+                       english_mode: bool = False, math_mode: bool = False) -> str:
     is_steam_prec = precision_data.get('is_hands_on', False)
+    comp_data = comp_data or {}
 
     if english_mode:
         html_dir = "ltr"
@@ -223,8 +224,11 @@ def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_da
         spelling_label = "Spelling words:"
         extra_key_label = "Additional answer key:"
         vocab_title = "🟡 Vocabulary Station — Answer Key"
+        fill_label = "Fill-in sentence answers:"
         methods_title = "🔵 Success Criteria — Methods Station"
         criteria_label = "Assessment criteria:"
+        model_label = "📝 Sample student answer:"
+        comp_title = "🔴 Discussion Guidance — Comprehension Station"
         list_pad = "padding-left:18px;"
         footer_text = f"מחולל יחידות לימוד | Answer Key | {title} | Round {round_num} — © All rights reserved"
     else:
@@ -240,8 +244,11 @@ def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_da
         spelling_label = "מילות ההכתבה:"
         extra_key_label = "מפתח תשובות נוסף:"
         vocab_title = "🟡 פתרונות תחנת אוצר מילים"
+        fill_label = "תשובות השלמות:"
         methods_title = "🔵 מדדי הצלחה — תחנת שיטות"
         criteria_label = "קריטריונים להערכה:"
+        model_label = "📝 תשובה לדוגמה:"
+        comp_title = "🔴 הנחיות דיון — תחנת ההבנה"
         list_pad = "padding-right:18px;"
         is_steam = is_steam_prec or vocab_data.get('bilingual', False)
         footer_text = f"א\"ל השד\"ה{' STEAM' if is_steam else ''} | פתרונות ומדדי הצלחה | {title} | סבב {round_num} — © כל הזכויות שמורות"
@@ -298,6 +305,50 @@ def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_da
         prec_title_lang = '🟢 פתרונות קבוצת ניצ"ה'
         vocab_title = "🟡 פתרונות מתמטיקה עם המורה"
         methods_title = "🔵 מדדי הצלחה — מתמטיקה עם חבר"
+        comp_title = "🔴 הנחיות דיון — מתמטיקה בעצמי"
+
+    # ── Comprehension section (discussion notes) ──────────────────────────
+    disc_notes = comp_data.get('discussion_notes', [])
+    written_model = (comp_data.get('written_response_model', '') or
+                     comp_data.get('answer_guide', ''))
+    comp_section = ""
+    if disc_notes or written_model:
+        notes_html = "".join([
+            f'<div style="margin-bottom:10px; padding:8px; background:#fff; border-radius:6px; border:1px solid #e8d4d4;">'
+            f'<div style="font-weight:600; color:#c0392b; font-size:12.5px;">{n.get("question","")}</div>'
+            f'<div style="font-size:12px; color:#555; margin-top:4px;">💡 {n.get("key_ideas","")}</div>'
+            f'</div>'
+            for n in disc_notes
+        ])
+        model_html = (f'<div style="background:#fde8e8; border-radius:6px; padding:8px; margin-top:8px; font-size:12px;">'
+                      f'<strong>✍️ תשובה כתובה לדוגמה:</strong><br>{written_model}</div>'
+                      if written_model else "")
+        comp_section = f"""
+<div style="margin-bottom:16px;">
+    <div class="section-title" style="background:#c0392b;">{comp_title}</div>
+    <div style="margin-top:8px;">{notes_html}{model_html}</div>
+</div>"""
+
+    # ── Vocabulary fill-sentences answers ─────────────────────────────────
+    fill_html = ""
+    fill_sentences = vocab_data.get('fill_sentences', [])
+    if fill_sentences:
+        fills = "".join([
+            f'<li style="margin-bottom:4px;">{fs.get("sentence","").replace("_____", "<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>")} '
+            f'→ <strong style="color:#7d6608;">{fs.get("answer","")}</strong></li>'
+            for fs in fill_sentences
+        ])
+        fill_html = f'<div style="margin-top:8px;"><strong>{fill_label}</strong><ul style="{list_pad} font-size:12px;">{fills}</ul></div>'
+
+    # ── Methods model answer ───────────────────────────────────────────────
+    model_answer = (methods_data.get('model_answer', '') or
+                    methods_data.get('sample_work', '') or
+                    methods_data.get('model_solution', ''))
+    model_html = ""
+    if model_answer:
+        model_html = (f'<div style="background:#e8f4fd; border:1px solid #2980b9; border-radius:6px; '
+                      f'padding:8px; margin-top:10px; font-size:12px;">'
+                      f'<strong>{model_label}</strong><br>{model_answer}</div>')
 
     return f"""<!DOCTYPE html>
 <html dir="{html_dir}" lang="{html_lang}">
@@ -310,6 +361,8 @@ def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_da
     {answers_only_msg}
 </div>
 
+{comp_section}
+
 {prec_section}
 
 <div style="margin-bottom:16px;">
@@ -317,6 +370,7 @@ def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_da
     <div style="background:#fef9e7; border:1px solid #f1c40f; border-radius:6px; padding:10px; margin-top:8px; font-size:12.5px;">
         {vocab_data.get('answer_key', '')}
     </div>
+    {fill_html}
 </div>
 
 <div style="margin-bottom:16px;">
@@ -324,6 +378,7 @@ def render_answer_key(title: str, round_num: int, precision_data: Dict, vocab_da
     <div style="margin-top:8px; font-size:12.5px;">
         <strong>{criteria_label}</strong>
         <ul style="{list_pad}">{"".join([f"<li>{c}</li>" for c in methods_data.get('success_criteria', [])])}</ul>
+        {model_html}
     </div>
 </div>
 

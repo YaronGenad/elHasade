@@ -67,7 +67,7 @@ def generate_roadmap(user_input: Dict[str, Any], output_dir: str = "output") -> 
 
     provider = _PROVIDER_LABEL
     math_mode = is_math(subject)
-    steam_mode = user_input.get("include_stem", False) and not math_mode
+    steam_mode = (user_input.get("include_stem", False) or is_stem(subject)) and not math_mode
     english_mode = is_english(subject)
     if math_mode:
         mode_label = "Math"
@@ -154,7 +154,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     round_plan = rounds_list[round_num - 1]
 
     math_mode = is_math(subject)
-    steam_mode = user_input.get("include_stem", False) and not math_mode
+    steam_mode = (user_input.get("include_stem", False) or is_stem(subject)) and not math_mode
     english_mode = is_english(subject)
     if math_mode:
         mode_label = "Math"
@@ -444,7 +444,7 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
     # Answer Key
     log.info("station_start", station="answer_key", round=round_num)
     answers_html = _render("answer_key", render_answer_key, topic, round_num, prec_data,
-                           vocab_data, meth_data, english_mode=english_mode, math_mode=math_mode)
+                           vocab_data, meth_data, comp_data, english_mode=english_mode, math_mode=math_mode)
     answers_path = f"{output_dir}/{safe_name}_round{round_num}_answer_key.html"
     _save(answers_html, answers_path, "answer_key")
     files['answer_key'] = answers_path

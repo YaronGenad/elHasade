@@ -215,6 +215,7 @@ def build_math_methods_prompt(subject: str, topic: str, grade: str,
     "☑ בדקנו יחד את התשובות",
     "☑ החלפנו תפקידים לפחות פעם אחת"
   ],
+  "model_solution": "פתרון מלא לדוגמה לאחד מתרגילי המשחק — כולל כל שלב חישובי — למורה בלבד",
   "is_math_friend": true
 }}"""
 

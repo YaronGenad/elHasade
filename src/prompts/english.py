@@ -159,6 +159,9 @@ Include 4-5 graded oral prompts:
     "Opinion/dilemma oral question — share your view",
     "Open-ended oral discussion prompt",
     "Summary oral reflection — tell your partner 3 things that happened"
+  ],
+  "discussion_notes": [
+    {{"question": "the discussion question", "key_ideas": "key ideas and expected responses — for teacher only"}}
   ]
 }}"""
 
@@ -231,7 +234,8 @@ Text context: {text_summary[:300]}{curric}
   }},
   "words_range": "X-Y words",
   "lines_needed": 10,
-  "success_criteria": ["criterion 1", "criterion 2", "criterion 3"]
+  "success_criteria": ["criterion 1", "criterion 2", "criterion 3"],
+  "model_answer": "A complete sample student response following the writing strategy structure, at appropriate CEFR level"
 }}"""
 
 
