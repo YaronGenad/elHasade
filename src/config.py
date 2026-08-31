@@ -32,7 +32,7 @@ GEMINI_MAX_COST_PER_GENERATION_USD: float = 2.00  # 3x observed max ($0.017); ti
 
 # --- Claude (primary provider) ---
 CLAUDE_MODEL: str = "claude-sonnet-5"
-CLAUDE_MAX_OUTPUT_TOKENS: int = 32000
+CLAUDE_MAX_OUTPUT_TOKENS: int = 20000
 CLAUDE_INPUT_COST_PER_1M: float = 2.00
 CLAUDE_OUTPUT_COST_PER_1M: float = 10.00
 
