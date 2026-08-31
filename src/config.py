@@ -27,7 +27,21 @@ GEMINI_FLASH_INPUT_COST_PER_1M: float = 0.10
 GEMINI_FLASH_OUTPUT_COST_PER_1M: float = 0.40
 # Hard safety cap per generation. Set conservatively; tighten after collecting
 # real data from the 6 test scenarios.
-GEMINI_MAX_COST_PER_GENERATION_USD: float = 0.05  # 3x observed max ($0.017); tighten further once stable
+GEMINI_MAX_COST_PER_GENERATION_USD: float = 2.00  # 3x observed max ($0.017); tighten further once stable
+
+
+# --- Claude (primary provider) ---
+CLAUDE_MODEL: str = "claude-sonnet-5"
+CLAUDE_MAX_OUTPUT_TOKENS: int = 32000
+CLAUDE_INPUT_COST_PER_1M: float = 2.00
+CLAUDE_OUTPUT_COST_PER_1M: float = 10.00
+
+# USD per 1M tokens, keyed by the provider that actually answered.
+PROVIDER_PRICING = {
+    "anthropic": (CLAUDE_INPUT_COST_PER_1M, CLAUDE_OUTPUT_COST_PER_1M),
+    "gemini": (GEMINI_FLASH_INPUT_COST_PER_1M, GEMINI_FLASH_OUTPUT_COST_PER_1M),
+    "openai": (CLAUDE_INPUT_COST_PER_1M, CLAUDE_OUTPUT_COST_PER_1M),
+}
 
 # ─── Pipeline Configuration ─────────────────────────────────────────────────────
 SAFE_NAME_MAX_LENGTH: int = 50

@@ -9,6 +9,8 @@ from google import genai
 from google.genai import types
 
 from .config import (
+    CLAUDE_MODEL,
+    CLAUDE_MAX_OUTPUT_TOKENS,
     GEMINI_MAX_RETRIES,
     GEMINI_MAX_OUTPUT_TOKENS,
     GEMINI_MODEL,
@@ -319,7 +321,7 @@ def _call_anthropic(
         raise ValueError("ANTHROPIC_API_KEY not set")
 
     client = _anthropic.Anthropic(api_key=api_key)
-    model = "claude-haiku-4-5-20251001"
+    model = CLAUDE_MODEL
     system_prompt = (
         "You are a JSON generator. Always respond with valid JSON only — "
         "no markdown, no code fences, no explanation."
@@ -331,7 +333,7 @@ def _call_anthropic(
         try:
             response = client.messages.create(
                 model=model,
-                max_tokens=8192,
+                max_tokens=CLAUDE_MAX_OUTPUT_TOKENS,
                 system=system_prompt,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -374,18 +376,44 @@ def _call_anthropic(
     raise last_exc
 
 
+_LAST_PROVIDER = "gemini"
+
+
+def last_provider() -> str:
+    """Provider that served the most recent successful call."""
+    return _LAST_PROVIDER
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def call_gemini(
     prompt: str, max_retries: int = GEMINI_MAX_RETRIES
 ) -> Tuple[Dict[str, Any], Dict[str, int]]:
-    """Try Gemini (all keys, round-robin) → OpenAI → Anthropic."""
-    # Python 3 deletes `except X as var` after the block — save to plain vars.
+    """Try Anthropic (primary) -> Gemini (all keys, round-robin) -> OpenAI."""
+    global _LAST_PROVIDER
+    # Python 3 deletes `except X as var` after the block - save to plain vars.
+    anthropic_err: Exception = Exception("anthropic not attempted")
     gemini_err: Exception = Exception("gemini not attempted")
-    openai_err: Exception = Exception("openai not attempted")
 
     try:
-        return _call_gemini(prompt, max_retries)
+        result, usage = _call_anthropic(prompt)
+        usage["provider"] = "anthropic"
+        _LAST_PROVIDER = "anthropic"
+        return result, usage
+    except Exception as e:
+        anthropic_err = e
+        log.warning(
+            "anthropic_failed",
+            error=str(e)[:300],
+            trying_fallback="gemini",
+        )
+
+    try:
+        result, usage = _call_gemini(prompt, max_retries)
+        usage["provider"] = "gemini"
+        _LAST_PROVIDER = "gemini"
+        log.info("gemini_fallback_success")
+        return result, usage
     except Exception as e:
         gemini_err = e
         log.warning(
@@ -396,29 +424,20 @@ def call_gemini(
 
     try:
         result, usage = _call_openai(prompt)
+        usage["provider"] = "openai"
+        _LAST_PROVIDER = "openai"
         log.info("openai_fallback_success")
-        return result, usage
-    except Exception as e:
-        openai_err = e
-        log.warning(
-            "openai_fallback_failed",
-            error=str(e)[:300],
-            trying_fallback="anthropic",
-        )
-
-    try:
-        result, usage = _call_anthropic(prompt)
-        log.info("anthropic_fallback_success")
         return result, usage
     except Exception as e:
         log.error(
             "all_providers_failed",
+            anthropic=str(anthropic_err)[:200],
             gemini=str(gemini_err)[:200],
-            openai=str(openai_err)[:200],
-            anthropic=str(e)[:200],
+            openai=str(e)[:200],
         )
         from .exceptions import LLMAPIError
+
         raise LLMAPIError(
             message="All LLM providers failed",
-            detail=f"Gemini: {gemini_err} | OpenAI: {openai_err} | Anthropic: {e}",
+            detail=f"Anthropic: {anthropic_err} | Gemini: {gemini_err} | OpenAI: {e}",
         ) from e

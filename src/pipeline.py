@@ -10,6 +10,7 @@ from .exceptions import LLMAPIError, PDFRenderError, CostLimitExceededError
 from .config import (
     is_stem, is_english, is_math, SAFE_NAME_MAX_LENGTH, DEFAULT_ROUNDS,
     GEMINI_FLASH_INPUT_COST_PER_1M, GEMINI_FLASH_OUTPUT_COST_PER_1M,
+    PROVIDER_PRICING,
     GEMINI_MAX_COST_PER_GENERATION_USD, make_safe_name,
 )
 from .images import ImageService, UsedImageKeys
@@ -236,9 +237,13 @@ def generate_round(user_input: Dict[str, Any], roadmap: Dict[str, Any], round_nu
         round_usage["output_tokens"] += usage["output_tokens"]
         round_usage["cached_tokens"] += usage["cached_tokens"]
 
+        _in_price, _out_price = PROVIDER_PRICING.get(
+            usage.get("provider", "gemini"),
+            (GEMINI_FLASH_INPUT_COST_PER_1M, GEMINI_FLASH_OUTPUT_COST_PER_1M),
+        )
         call_cost = (
-            usage["input_tokens"] * GEMINI_FLASH_INPUT_COST_PER_1M / 1_000_000
-            + usage["output_tokens"] * GEMINI_FLASH_OUTPUT_COST_PER_1M / 1_000_000
+            usage["input_tokens"] * _in_price / 1_000_000
+            + usage["output_tokens"] * _out_price / 1_000_000
         )
         accumulated_cost_usd += call_cost
 
@@ -572,9 +577,15 @@ def generate_all_rounds(user_input: Dict[str, Any], roadmap: Dict[str, Any], out
     if not make_pdf([f for f in all_teacher_files if f], unit_teacher_pdf, topic, f"יחידה מלאה — {total} סבבים — למורה", subject=subject, grade=grade):
         log.warning("full_teacher_pdf_failed", path=unit_teacher_pdf)
 
+    from .gemini import last_provider
+
+    _tin, _tout = PROVIDER_PRICING.get(
+        last_provider(),
+        (GEMINI_FLASH_INPUT_COST_PER_1M, GEMINI_FLASH_OUTPUT_COST_PER_1M),
+    )
     total_cost_usd = (
-        total_usage["input_tokens"] * GEMINI_FLASH_INPUT_COST_PER_1M / 1_000_000
-        + total_usage["output_tokens"] * GEMINI_FLASH_OUTPUT_COST_PER_1M / 1_000_000
+        total_usage["input_tokens"] * _tin / 1_000_000
+        + total_usage["output_tokens"] * _tout / 1_000_000
     )
     log.info(
         "all_rounds_complete",
